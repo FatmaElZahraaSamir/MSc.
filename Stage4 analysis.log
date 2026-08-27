@@ -1,0 +1,128 @@
+11.3s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+11.3s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+11.3s 3 0.00s - to python to disable frozen modules.
+11.3s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+12.2s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+12.2s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+12.2s 7 0.00s - to python to disable frozen modules.
+12.2s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+14.2s 9 ==============================================================================
+14.2s 10 ATTACHED INPUTS
+14.2s 11 ==============================================================================
+14.2s 12 
+14.2s 13 unified.parquet   <- Stage 1 corpus        (Stages 2, 4)
+14.2s 14 /kaggle/input/datasets/zahrasamir/stage1-outputs/unified.parquet
+14.2s 15 95,290 bytes   2026-08-27 08:52  >> THIS ONE WILL BE USED
+14.2s 16 
+14.2s 17 splits.json   <- Stage 1 splits        (Stage 2)
+14.2s 18 /kaggle/input/datasets/zahrasamir/stage1-outputs/splits.json
+14.2s 19 1,454,089 bytes   2026-08-27 08:52  >> THIS ONE WILL BE USED
+14.2s 20 
+14.2s 21 predictions_finetuned.parquet   <- Stage 2 encoder store (Stage 2 resume, 4, 5)
+14.2s 22 /kaggle/input/datasets/zahrasamir/stage2-outputs/predictions_finetuned.parquet
+14.2s 23 210,255 bytes   2026-08-27 08:52  >> THIS ONE WILL BE USED
+14.2s 24 
+14.2s 25 predictions_llm.parquet   <- Stage 3 LLM binary    (Stages 4, 5)
+14.2s 26 (not attached)
+14.2s 27 
+14.2s 28 predictions_subtype.parquet   <- Stage 3b raw subtype  (Stage 3b-repair)
+14.2s 29 (not attached)
+14.2s 30 
+14.2s 31 predictions_subtype_repaired.parquet   <- Stage 3b repaired    (Stages 4, 5)
+14.2s 32 /kaggle/input/notebooks/zahrasamir/stage3b-repair/predictions_subtype_repaired.parquet
+14.2s 33 428,497 bytes   2026-08-27 08:52  >> THIS ONE WILL BE USED
+14.2s 34 
+14.2s 35 predictions_llm_repaired.parquet   <- Stage 3b R8 binary   (Stages 4, 5)
+14.2s 36 /kaggle/input/notebooks/zahrasamir/stage3b-repair/predictions_llm_repaired.parquet
+14.2s 37 841,382 bytes   2026-08-27 08:52  >> THIS ONE WILL BE USED
+14.2s 38 
+14.2s 39 tab9_evaluability.csv   <- Stage 4 gate          (Stage 5)
+14.2s 40 (not attached)
+14.2s 41 
+14.2s 42 ==============================================================================
+14.2s 43 ROW COUNTS OF WHAT WILL ACTUALLY BE READ
+14.2s 44 ==============================================================================
+15.9s 45 unified.parquet                          1,412 rows   expected 1,412   OK
+15.9s 46 predictions_finetuned.parquet           24,280 rows   expected 16,900 before Stage 2 / 24,280 after it   OK
+15.9s 47 -> this is the NEW store (required by Stages 4 and 5)
+15.9s 48 predictions_subtype_repaired.parquet    16,786 rows   expected 16,786   OK
+16.1s 49 predictions_llm_repaired.parquet        35,049 rows   expected 35,049   OK
+16.1s 50 
+16.1s 51 splits.json: 14 families, 107 folds   OK
+16.1s 52 
+16.1s 53 ==============================================================================
+16.1s 54 No duplicates. Running the stage now.
+16.1s 55 ==============================================================================
+16.1s 56 
+18.5s 57 [load] finetuned     24,280 rows  /kaggle/input/datasets/zahrasamir/stage2-outputs/predictions_finetuned.parquet
+18.5s 58 [load] llm_binary    35,049 rows  /kaggle/input/notebooks/zahrasamir/stage3b-repair/predictions_llm_repaired.parquet
+18.5s 59 [load] llm_subtype   16,786 rows  /kaggle/input/notebooks/zahrasamir/stage3b-repair/predictions_subtype_repaired.parquet
+18.8s 60 [strict] adopted y_pred_strict on 51,835 row(s); 0 differed from the value recomputed here
+18.8s 61 [store] 76,115 rows | tasks ['fr_nfr', 'security', 'subtype_all', 'subtype_top4', 'subtype_top6'] | regimes ['cross_dataset', 'cross_project', 'cross_project_lopo', 'in_domain', 'prompted']
+18.8s 62 [head] 47,663 rows | encoder 24,280 | prompted LLM 23,383
+23.9s 63 [gate] 6/87 cells not reportable -> excluded from tables and greyed in figures
+23.9s 64 Gemini-3.1-Flash-Lite      subtype_all   promise  prompted       n=60    class support<5
+23.9s 65 Gemini-3.1-Flash-Lite      subtype_top6  promise  prompted       n=60    class support<5
+23.9s 66 Llama-3.3-70B (Groq)       subtype_all   promise  prompted       n=163   class support<5
+23.9s 67 Nemotron 3 Nano 30B A3B    fr_nfr        promise  prompted       n=21    n<40; parse<0.5
+23.9s 68 Nemotron 3 Nano 30B A3B    security      promise  prompted       n=21    class support<5; n<40
+23.9s 69 Nemotron 3 Nano 30B A3B    security      secreq   prompted       n=21    n<40
+23.9s 70 [tab1/2] regime-stratified main tables written (36 encoder cells included)
+24.1s 71 [tab3] 26 gap rows
+26.7s 72 [tab4] 260 tests | sig raw 175 | BH 170 | Holm 131
+27.3s 73 [tab10] 59 row(s) scored on the shared subset
+29.0s 74 [tab7] 90 few-shot tests | sig raw 49 | BH 44 | Holm 27
+34.1s 75 NOTE: 12 row(s) cover <80% of the projects OR of the items the best-covered model saw; their spread is NOT comparable and is flagged spread_comparable=False.
+34.1s 76 [tab11] 1354 model x project cell(s); 60 spread row(s)
+34.1s 77 widest per-project spread (the RQ2 'does it differ by model class?' evidence):
+34.1s 78 Qwen2.5-3B                 fr_nfr        promise  acc 0.000-1.000 (median 0.571, sd 0.301, worst: project 24)
+34.1s 79 SmolLM3-3B                 fr_nfr        promise  acc 0.000-1.000 (median 0.545, sd 0.292, worst: project 12)
+34.1s 80 Gemma-2-2B                 fr_nfr        promise  acc 0.000-1.000 (median 0.636, sd 0.263, worst: project 24)
+34.1s 81 Llama-3.1-8B               fr_nfr        promise  acc 0.000-1.000 (median 0.667, sd 0.255, worst: project 25)
+34.1s 82 Qwen2.5-7B                 fr_nfr        promise  acc 0.000-1.000 (median 0.636, sd 0.240, worst: project 25)
+36.5s 83 [fig] fig1_rq1_in_domain
+37.6s 84 [fig] fig2_rq2_transfer
+38.7s 85 [fig] fig3_generalisation_gap
+40.0s 86 [fig] fig4_subtypes
+41.5s 87 [fig] fig5_fewshot
+42.6s 88 [fig] fig6_perclass_heatmap
+42.6s 89 
+42.6s 90 [done] outputs:
+42.6s 91 fig1_rq1_in_domain.pdf                     39.2 KB
+42.6s 92 fig1_rq1_in_domain.png                    331.5 KB
+42.6s 93 fig2_rq2_transfer.pdf                      37.6 KB
+42.6s 94 fig2_rq2_transfer.png                     258.5 KB
+42.6s 95 fig3_generalisation_gap.pdf                31.5 KB
+42.6s 96 fig3_generalisation_gap.png               403.8 KB
+42.6s 97 fig4_subtypes.pdf                          34.8 KB
+42.6s 98 fig4_subtypes.png                         289.9 KB
+42.6s 99 fig5_fewshot.pdf                           39.8 KB
+42.6s 100 fig5_fewshot.png                          355.9 KB
+42.6s 101 fig6_perclass_heatmap.pdf                  43.5 KB
+42.6s 102 fig6_perclass_heatmap.png                 177.8 KB
+42.6s 103 stage4_provenance.json                      2.8 KB
+42.6s 104 tab0_baselines.csv                          0.3 KB
+42.6s 105 tab10_like_for_like.csv                     5.4 KB
+42.6s 106 tab11_per_project.csv                      85.4 KB
+42.6s 107 tab11b_per_project_spread.csv               6.9 KB
+42.6s 108 tab1_main_in_domain.csv                     0.9 KB
+42.6s 109 tab1_main_in_domain.tex                     1.5 KB
+42.6s 110 tab1w_main_in_domain_weightedF1.csv         0.9 KB
+42.6s 111 tab2_main_transfer.csv                      1.3 KB
+42.6s 112 tab2_main_transfer.tex                      2.7 KB
+42.6s 113 tab2w_main_transfer_weightedF1.csv          1.3 KB
+42.6s 114 tab3_generalisation_gap.csv                 3.3 KB
+42.6s 115 tab4_mcnemar.csv                           33.7 KB
+42.6s 116 tab5_subtype.csv                            1.8 KB
+42.6s 117 tab6_perclass.csv                          32.8 KB
+42.6s 118 tab7_fewshot.csv                            8.6 KB
+42.6s 119 tab8_prompt_sensitivity.csv                 0.6 KB
+42.6s 120 tab9_evaluability.csv                      12.5 KB
+46.6s 121 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+46.6s 122 cells[i][c] = re.sub('\\\\\|', '|', cell)
+46.8s 123 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+46.8s 124 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+47.7s 125 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+48.1s 126 [NbConvertApp] Writing 101162 bytes to __notebook__.ipynb
+51.7s 127 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+53.2s 128 [NbConvertApp] Writing 621400 bytes to __results__.html

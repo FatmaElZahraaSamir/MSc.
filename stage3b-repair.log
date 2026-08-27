@@ -1,0 +1,85 @@
+9.1s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+9.1s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+9.1s 3 0.00s - to python to disable frozen modules.
+9.1s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+9.8s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+9.8s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+9.8s 7 0.00s - to python to disable frozen modules.
+9.8s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+11.4s 9 ==============================================================================
+11.4s 10 ATTACHED INPUTS
+11.4s 11 ==============================================================================
+11.4s 12 
+11.4s 13 unified.parquet   <- Stage 1 corpus        (Stages 2, 4)
+11.4s 14 (not attached)
+11.4s 15 
+11.4s 16 splits.json   <- Stage 1 splits        (Stage 2)
+11.4s 17 (not attached)
+11.4s 18 
+11.4s 19 predictions_finetuned.parquet   <- Stage 2 encoder store (Stage 2 resume, 4, 5)
+11.4s 20 (not attached)
+11.4s 21 
+11.4s 22 predictions_llm.parquet   <- Stage 3 LLM binary    (Stages 4, 5)
+11.4s 23 /kaggle/input/datasets/zahrasamir/stage3-llm-harness/predictions_llm.parquet
+11.4s 24 823,810 bytes   2026-08-27 08:44  >> THIS ONE WILL BE USED
+11.4s 25 
+11.4s 26 predictions_subtype.parquet   <- Stage 3b raw subtype  (Stage 3b-repair)
+11.4s 27 /kaggle/input/datasets/zahrasamir/stage3b-subtype-outputs/predictions_subtype.parquet
+11.4s 28 411,559 bytes   2026-08-27 08:44  >> THIS ONE WILL BE USED
+11.4s 29 
+11.4s 30 predictions_subtype_repaired.parquet   <- Stage 3b repaired    (Stages 4, 5)
+11.4s 31 (not attached)
+11.4s 32 
+11.4s 33 tab9_evaluability.csv   <- Stage 4 gate          (Stage 5)
+11.4s 34 (not attached)
+11.4s 35 
+11.4s 36 ==============================================================================
+11.4s 37 ROW COUNTS OF WHAT WILL ACTUALLY BE READ
+11.4s 38 ==============================================================================
+13.0s 39 predictions_llm.parquet                 35,049 rows   expected 35,049   OK
+13.0s 40 predictions_subtype.parquet             16,786 rows   expected 16,786   OK
+13.0s 41 
+13.0s 42 ==============================================================================
+13.0s 43 No duplicates. Running the stage now.
+13.0s 44 ==============================================================================
+13.0s 45 
+15.2s 46 [load] /kaggle/input/datasets/zahrasamir/stage3b-subtype-outputs/predictions_subtype.parquet  ->  16,786 rows, 8 models
+15.2s 47 [R1] scope reconstructed: {'subtype_all': (218, 491), 'subtype_top4': (200, 341), 'subtype_top6': (200, 415)} (core, full) unique ids per task
+15.9s 48 [R6] positional re-parse changes 0 / 16786 predictions (0.00%) -> s3b_fix_reparse_diff.csv
+15.9s 49 [R6] APPLY_REPARSE=True: positional parse adopted as canonical.
+18.9s 50 [R3/R4/R5] summary: 84 cells -> s3b_fix_summary.csv
+18.9s 51 [R5] 3 / 84 cells fall below MIN_CLASS_SUPPORT=5 and are marked not reportable.
+19.3s 52 [R2] few-shot: 36 paired comparisons, 4 sign flips vs the unpaired full-frame k=0 baseline -> s3b_fix_fewshot_paired.csv
+19.6s 53 [R7] like-for-like table -> s3b_fix_likeforlike.csv
+19.9s 54 [perclass] -> s3b_fix_perclass.csv
+19.9s 55 [MNAR] worst per-class API dropout:
+19.9s 56 model_tag         task        category  dropped  attempted  dropout_pct
+19.9s 57 groq-llama-3.3-70b-versatile  subtype_all maintainability        6         10         60.0
+19.9s 58 groq-llama-3.3-70b-versatile subtype_top6     performance       10         30         33.3
+19.9s 59 groq-llama-3.3-70b-versatile subtype_top6       usability       13         40         32.5
+22.1s 60 [R8] binary store: positional re-parse changes 18 / 35049 predictions (0.05%) -> s3b_fix_binary_reparse_diff.csv
+22.1s 61 by model: {'openrouter-nemotron-3-nano-30b-a3b': 17, 'qwen2.5-7b-instruct': 1}
+22.5s 62 [R8] wrote predictions_llm_repaired.parquet (35,049 rows). Stage 4 and Stage 5 prefer this over the harness store.
+22.5s 63 
+22.5s 64 [done] wrote:
+22.5s 65 predictions_llm_repaired.csv 9250.0 KB
+22.5s 66 predictions_llm_repaired.parquet 821.7 KB
+22.5s 67 predictions_subtype_repaired.csv 4928.3 KB
+22.5s 68 predictions_subtype_repaired.parquet 418.5 KB
+22.5s 69 s3b_fix_binary_reparse_diff.csv 2.7 KB
+22.5s 70 s3b_fix_evaluability.csv 5.8 KB
+22.5s 71 s3b_fix_fewshot_paired.csv 4.4 KB
+22.5s 72 s3b_fix_likeforlike.csv 4.7 KB
+22.5s 73 s3b_fix_missingness.csv 1.6 KB
+22.5s 74 s3b_fix_perclass.csv 46.1 KB
+22.5s 75 s3b_fix_reparse_diff.csv 0.1 KB
+22.5s 76 s3b_fix_report.md 3.0 KB
+22.5s 77 s3b_fix_summary.csv 14.1 KB
+25.9s 78 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+25.9s 79 cells[i][c] = re.sub('\\\\\|', '|', cell)
+26.1s 80 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+26.1s 81 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+26.9s 82 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+27.2s 83 [NbConvertApp] Writing 62404 bytes to __notebook__.ipynb
+30.2s 84 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+31.4s 85 [NbConvertApp] Writing 471387 bytes to __results__.html
