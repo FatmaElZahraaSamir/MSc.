@@ -1,0 +1,90 @@
+9.2s 1 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+9.2s 2 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+9.2s 3 0.00s - to python to disable frozen modules.
+9.2s 4 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+9.9s 5 0.00s - Debugger warning: It seems that frozen modules are being used, which may
+9.9s 6 0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off
+9.9s 7 0.00s - to python to disable frozen modules.
+9.9s 8 0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.
+11.4s 9 ==============================================================================
+11.4s 10 ATTACHED INPUTS
+11.4s 11 ==============================================================================
+11.4s 12 
+11.4s 13 unified.parquet   <- Stage 1 corpus        (Stages 2, 4)
+11.4s 14 (not attached)
+11.4s 15 
+11.4s 16 splits.json   <- Stage 1 splits        (Stage 2)
+11.4s 17 (not attached)
+11.4s 18 
+11.4s 19 predictions_finetuned.parquet   <- Stage 2 encoder store (Stage 2 resume, 4, 5)
+11.4s 20 /kaggle/input/datasets/zahrasamir/stage2-outputs/predictions_finetuned.parquet
+11.4s 21 210,255 bytes   2026-08-27 10:07  >> THIS ONE WILL BE USED
+11.4s 22 
+11.4s 23 predictions_llm.parquet   <- Stage 3 LLM binary    (Stages 4, 5)
+11.4s 24 (not attached)
+11.4s 25 
+11.4s 26 predictions_subtype.parquet   <- Stage 3b raw subtype  (Stage 3b-repair)
+11.4s 27 (not attached)
+11.4s 28 
+11.4s 29 predictions_subtype_repaired.parquet   <- Stage 3b repaired    (Stages 4, 5)
+11.4s 30 /kaggle/input/notebooks/zahrasamir/stage3b-repair/predictions_subtype_repaired.parquet
+11.4s 31 428,497 bytes   2026-08-27 10:07  >> THIS ONE WILL BE USED
+11.4s 32 
+11.4s 33 predictions_llm_repaired.parquet   <- Stage 3b R8 binary   (Stages 4, 5)
+11.4s 34 /kaggle/input/notebooks/zahrasamir/stage3b-repair/predictions_llm_repaired.parquet
+11.4s 35 841,382 bytes   2026-08-27 10:07  >> THIS ONE WILL BE USED
+11.4s 36 
+11.4s 37 tab9_evaluability.csv   <- Stage 4 gate          (Stage 5)
+11.4s 38 /kaggle/input/notebooks/zahrasamir/stage4-analysis/tab9_evaluability.csv
+11.4s 39 12,836 bytes   2026-08-27 10:07  >> THIS ONE WILL BE USED
+11.4s 40 
+11.4s 41 ==============================================================================
+11.4s 42 ROW COUNTS OF WHAT WILL ACTUALLY BE READ
+11.4s 43 ==============================================================================
+12.8s 44 predictions_finetuned.parquet           24,280 rows   expected 16,900 before Stage 2 / 24,280 after it   OK
+12.8s 45 -> this is the NEW store (required by Stages 4 and 5)
+12.8s 46 predictions_subtype_repaired.parquet    16,786 rows   expected 16,786   OK
+12.8s 47 predictions_llm_repaired.parquet        35,049 rows   expected 35,049   OK
+12.8s 48 
+12.8s 49 ==============================================================================
+12.8s 50 No duplicates. Running the stage now.
+12.8s 51 ==============================================================================
+12.8s 52 
+12.8s 53 [load] finetuned     24,280 rows
+12.8s 54 [load] llm_binary    35,049 rows
+13.1s 55 [load] llm_subtype   16,786 rows
+13.3s 56 [head] 47,663 rows | encoder 24,280 | prompted 23,383
+13.3s 57 [gate] /kaggle/input/notebooks/zahrasamir/stage4-analysis/tab9_evaluability.csv -> 81 reportable cells (34 of them encoder cells)
+13.3s 58 [cost1] 81 rows
+13.7s 59 [cost2] 10 Pareto-optimal configurations
+13.7s 60 [cost3] 276 encoder/alternative pairs | finite break-even in 276
+13.7s 61 [fig] deployment view for figures: 59 rows (22 transfer-regime encoder rows kept in the tables, not plotted)
+13.7s 62 [fig7] plotting the first 3 of 6 eligible cells; omitted: [('subtype_all', 'promise'), ('subtype_top4', 'promise'), ('subtype_top6', 'promise')] - their numbers remain in cost1/cost2.
+15.8s 63 [fig] fig7_pareto
+16.6s 64 [fig] fig8_breakeven
+17.1s 65 [fig] fig9_cost_per_correct
+17.5s 66 [fig] fig10_latency
+17.5s 67 
+17.5s 68 [done] outputs:
+17.5s 69 cost1_per_model.csv                      16.8 KB
+17.5s 70 cost2_pareto.csv                          1.1 KB
+17.5s 71 cost3_breakeven.csv                      35.6 KB
+17.5s 72 cost4_sensitivity.csv                    34.1 KB
+17.5s 73 cost5_scaling.csv                        30.9 KB
+17.5s 74 fig10_latency.pdf                        27.7 KB
+17.5s 75 fig10_latency.png                       186.8 KB
+17.5s 76 fig7_pareto.pdf                          34.7 KB
+17.5s 77 fig7_pareto.png                         251.3 KB
+17.5s 78 fig8_breakeven.pdf                       31.1 KB
+17.5s 79 fig8_breakeven.png                      229.3 KB
+17.5s 80 fig9_cost_per_correct.pdf                28.5 KB
+17.5s 81 fig9_cost_per_correct.png               109.9 KB
+17.5s 82 stage5_provenance.json                    1.8 KB
+20.5s 83 /usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+20.5s 84 cells[i][c] = re.sub('\\\\\|', '|', cell)
+20.7s 85 /usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+20.7s 86 text = re.sub(r'_', '\_', text) # Escape underscores in display text
+21.3s 87 [NbConvertApp] Converting notebook __notebook__.ipynb to notebook
+21.5s 88 [NbConvertApp] Writing 59692 bytes to __notebook__.ipynb
+24.0s 89 [NbConvertApp] Converting notebook __notebook__.ipynb to html
+24.9s 90 [NbConvertApp] Writing 459120 bytes to __results__.html
