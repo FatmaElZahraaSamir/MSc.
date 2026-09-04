@@ -76,7 +76,7 @@ have it. The transferred encoder labels 44.2\% of items \textit{security}
 against a true prevalence of 12.9\%, reproducing its training corpus's 39.9\%
 prior; the prompted models' FR/NFR accuracy ranks with how badly they mis-set the
 same prior ($\rho = 0.95$), and merely re-wording the question moves it by up to
-0.485 \Fm{}. Encoders nevertheless stay 9--49$\times$ cheaper and repay their
+0.485 \Fm{}. Encoders nevertheless stay 9--47$\times$ cheaper and repay their
 training within 46--552 items. Fine-tune for a stable labelled domain; prompt
 when the distribution moves.
 \end{abstract}
@@ -316,7 +316,7 @@ corpus---the in-distribution reference arm prior work reports.
 \textbf{Cross-project} uses grouped folds holding out entire unseen project
 groups, plus a leave-one-project-out arm over the 47 \pex{} projects.
 \textbf{Cross-dataset} trains on the security task of one corpus and tests on the
-other ($\pex{} \leftrightarrow$ SecReq): identical label sets, different
+other (\pex{}~$\leftrightarrow$~SecReq): identical label sets, different
 annotation provenance.
 
 The asymmetry between the two model arms is the analytical lever. Encoders are
@@ -475,10 +475,10 @@ Three observations qualify the ranking. Scale does not order the results: the
 0.891), and the small open models collapse on FR/NFR (0.554--0.727) while
 remaining competitive on security. The encoder advantage widens with the label
 set---$+0.014$ on top-4, $+0.013$ on top-6, but $+0.095$ on all-11---as expected
-if supervision mainly buys the long tail. And because cell sizes differ ($n =
-59$--968), the top-4 ranking was recomputed on the 59 items every model answered,
-where the encoder margin is $+0.044$: the ordering is not an artefact of
-coverage. Every reportable model clears the majority-class baseline.
+if supervision mainly buys the long tail. And because cell sizes differ ($n = 59$--968), the top-4 ranking was recomputed
+on the 59 items every model answered, where the best encoder still leads the best
+prompted model by $+0.036$ (0.966 against 0.930): the ordering is not an artefact
+of coverage. Every reportable model clears the majority-class baseline.
 
 The paired tests make the in-domain verdict exact: over 106 in-domain
 comparisons, encoders win 67 and lose \emph{none}
@@ -632,7 +632,7 @@ deploy on an in-distribution score alone.
 \label{sec:rq3}
 Fig.~\ref{fig:cost} gives the economics. Encoder
 inference costs \$0.0024 per 1{,}000 classifications on the imputed T4 rental
-against \$0.0216--\$0.1132 for prompted alternatives---9 to 49 times more, 18
+against \$0.0216--\$0.1132 for prompted alternatives---9 to 47 times more, 18
 times at the medians. One-off fine-tuning is negligible (median \$0.0093 per
 deployable model, about 277 GPU-seconds over all folds of a family), so the
 break-even of Eq.~\eqref{eq:breakeven} is small: over all 276
@@ -642,11 +642,12 @@ them encoders; the single prompted frontier point is 4-bit Qwen2.5-7B on SecReq
 security---the strongest freely available fallback on the one cell where transfer
 is what is measured.
 
-Latency behaves differently. Per-request medians are 0.016\,s for the encoders,
-0.19--0.36\,s for the local open models, 0.61\,s for the commercial API and
-0.095\,s---the fastest in the study---for the hosted 70\,B model; but free-tier
-queueing inflates the hosted \emph{means} by up to two orders of magnitude, which
-is why all wall-clock projections use medians.
+Latency behaves differently. Median per-request latency is 0.016\,s for the
+encoders and, across the prompted models, 0.095\,s for the hosted 70\,B model
+(the fastest prompted tier), 0.19--0.36\,s for the local open models and
+0.61\,s for the commercial API; but free-tier queueing inflates the hosted
+\emph{means} by up to two orders of magnitude, which is why all wall-clock
+projections use medians.
 
 \begin{figure}[t]
 \centering
