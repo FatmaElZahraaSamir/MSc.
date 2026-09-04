@@ -39,7 +39,7 @@
 \draw[llmd] (spl.east) -- ++(0.42,0) |- (arm2.west);
 
 %% --- shared scoring spine ------------------------------------------------
-\node[src] (sco) at (\cE, 0) {\textbf{Strict scoring}\\[0.5pt]identical test items\\one-word parser;\\unparseable $=$ wrong\\76{,}115 predictions\\gate: 81 of 87 cells};
+\node[src] (sco) at (\cE, 0) {\textbf{Strict scoring}\\[0.5pt]identical test items\\prompted replies parsed;\\unparseable $=$ wrong\\76{,}115 predictions\\gate: 81 of 87 cells};
 \node[src] (ana) at (\cF, 0) {\textbf{Analysis}\\[0.5pt]\Fm{} $+$ bootstrap CI\\260 paired McNemar\\Holm and BH, $\alpha{=}0.05$\\cost, $N^{\star}{=}C_0/\Delta c$};
 
 \draw[encd] (arm1.east) -| ($(sco.north)+(0,0.34)$) -- (sco.north);
