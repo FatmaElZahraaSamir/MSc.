@@ -63,10 +63,10 @@ fine-tuned transformers on software requirements classification, and conclude
 that the task is close to solved. We show that this conclusion is an artefact of
 \emph{how} the field evaluates. Twelve configurations---four fine-tuned encoder
 variants and eight prompted LLMs spanning 4-bit open-weight models on a free-tier
-GPU, a hosted 70\,B model and a commercial API---classify 1{,}412 de-duplicated
-requirements from \pex{} and SecReq across three tasks and three evaluation
-regimes of increasing distribution shift: in-domain, cross-project and
-cross-dataset. All 76{,}115 predictions are scored under one strict rule; every
+GPU, a hosted 70\,B model and a commercial API---classify 1{,}412 de-duplicated requirements from \pex{} and SecReq across three
+tasks; the encoders are re-fitted at three regimes of increasing distribution
+shift---in-domain, cross-project, cross-dataset---while the prompted models,
+having nothing to fit, stay fixed. All 76{,}115 predictions are scored under one strict rule; every
 encoder--LLM comparison is McNemar-paired on identical items and corrected across
 a single 260-test family. In-domain the encoders win 67 of 106 tests and lose
 none. Under cross-dataset transfer the verdict inverts: prompted models win 48 of
@@ -74,9 +74,8 @@ none. Under cross-dataset transfer the verdict inverts: prompted models win 48 o
 unfamiliar vocabulary but an uncalibrated class prior---and both model families
 have it. The transferred encoder labels 44.2\% of items \textit{security}
 against a true prevalence of 12.9\%, reproducing its training corpus's 39.9\%
-prior; the prompted models' FR/NFR accuracy ranks with how badly they mis-set the
-same prior ($\rho = 0.95$), and merely re-wording the question moves it by up to
-0.485 \Fm{}. Encoders nevertheless stay 9--47$\times$ cheaper and repay their
+prior; the prompted models' FR/NFR accuracy tracks how close their own prior is to the
+truth ($\rho = 0.95$), and re-wording the question moves it by up to 0.485. Encoders nevertheless stay 9--47$\times$ cheaper and repay their
 training within 46--552 items. Fine-tune for a stable labelled domain; prompt
 when the distribution moves.
 \end{abstract}
@@ -133,17 +132,18 @@ regimes: 76{,}115 predictions scored once under one strict protocol, with 260
 exact McNemar tests corrected as a single family (Sections~\ref{sec:design}
 and~\ref{sec:results}).
 \item \textbf{The inversion result.} In-domain the encoders are never
-significantly beaten (67 wins, 39 ties, 0 losses). Under cross-dataset transfer
-the same comparisons reverse (3 wins, 13 ties, 48 losses), with the strongest
-in-domain encoder losing 42.8\% of its \Fm{}. The ranking a benchmark reports is
-a property of the regime it evaluates, not of the models
+significantly beaten (67 wins, 39 ties, 0 losses). Under cross-dataset
+transfer---which the design can pose only on the security task, the one task both
+corpora annotate---the verdict reverses (3 wins, 13 ties, 48 losses), the
+strongest in-domain encoder there losing 42.8\% of its \Fm{}. The ranking a
+benchmark reports is a property of the regime it evaluates, not of the models
 (Section~\ref{sec:rq2}).
 \item \textbf{A mechanism, not just a gap.} The collapse is consistent with
 base-rate shift rather than lexical novelty---the transferred encoder reproduces
 the prior of its \emph{training} corpus, so precision collapses while recall
-holds---and the prompted models prove to have the same defect from a different
-source: their FR/NFR accuracy ranks with how badly they mis-set the prior
-($\rho = 0.95$), and re-wording the question moves it
+holds---and the prompted models prove to have the same defect from another source: their FR/NFR
+accuracy tracks how close their own prior is to the truth ($\rho = 0.95$), and
+re-wording the question moves it
 (Sections~\ref{sec:rq2} and~\ref{sec:prior}).
 \item \textbf{An explicit accuracy--cost frontier.} Encoders cost
 \$0.0024 per 1{,}000 classifications against \$0.0216--\$0.1132 for prompted
@@ -254,10 +254,9 @@ same requirements, under the same tasks, against the same frozen splits, and are
 scored by one strict rule, so that every comparison we report is paired on
 identical items. Fig.~\ref{fig:arch} shows the design: a single data and scoring
 spine, two model arms that differ only in whether they consume training data,
-and three evaluation regimes of increasing distribution shift. The pipeline runs
-as seven stages, each writing a content-hashed artefact that the next stage
-consumes; every number in Section~\ref{sec:results} is read back from those
-artefacts.
+and three evaluation regimes of increasing distribution shift. The pipeline runs as seven stages, each writing a versioned artefact that the
+next stage consumes; every number in Section~\ref{sec:results} is read back from
+those artefacts.
 
 \input{figures/fig_architecture}
 
@@ -266,10 +265,10 @@ Two public corpora are merged (Table~\ref{tab:corpus}). \pex{}~\cite{lima2019}
 contributes 969 requirements from 47 projects, SecReq~\cite{knauss2011} 510 from
 three industrial security specifications. Texts are normalised and exact
 duplicates removed---67 rows, none shared between corpora---leaving 1{,}412
-requirements in 50 project groups. Splits are generated once with seed 42 and
-keyed by identifiers pinned to the SHA-256 hash of each source file; because
-grouped-fold membership depends on the library version that produced
-it~\cite{pedregosa2011}, the split file is consumed, never regenerated.
+requirements in 50 project groups. Splits are generated once with seed 42 and keyed by stable item identifiers over
+source files that the manifest pins by SHA-256; because grouped-fold membership
+depends on the library version that produced it~\cite{pedregosa2011}, the split
+file is consumed, never regenerated.
 
 The decisive property of this pair is a base-rate contrast: security requirements
 are 12.9\% of \pex{} but 39.9\% of SecReq---a three-fold difference in
@@ -324,11 +323,13 @@ re-trained at every station on that station's training folds. Prompted models
 have no training distribution, so their scores are regime-invariant by
 construction: they form a fixed reference line against which the encoders' drop
 is measured. Every requirement is a test item exactly once within each encoder
-family, so the encoders' stored predictions cover the corpus; the prompted models
-answer stratified samples of that same corpus---300 items per binary cell and 200
-per sub-type cell, allocated in proportion to the class prior with a floor of ten
-per class, and the six local models additionally answer the full evaluation
-frames. Every encoder--LLM comparison is therefore paired on identical
+family, so the encoders' stored predictions cover the corpus; the prompted models answer stratified samples of that same corpus---a 300-item
+core per binary cell and a 200-item core per sub-type cell (218 for the
+eleven-class variant), allocated in proportion to the class prior with a floor of
+ten per class. The six local models complete those cores and additionally answer the full
+evaluation frames; the rate-limited hosted and commercial arms complete as much
+of each core as their quotas allowed, so prompted cell sizes range from 59 to
+960. Every encoder--LLM comparison is paired on identical
 requirements, aligned by requirement identifier rather than by position.
 
 \subsection{Model configurations}
@@ -338,13 +339,14 @@ fine-tunes \texttt{bert-base-uncased}~\cite{devlin2019} and
 lr $2\times10^{-5}$, batch 16, max length 128, linear decay without warmup, full
 precision; 3 epochs on the binary tasks, 10 on the sub-types), each with
 inverse-frequency (\textit{balanced}) class weighting in the loss, plus an
-unweighted control on the security task. The local open
+unweighted control on the security task's in-domain \pex{} and cross-dataset
+families. The local open
 tier runs six instruction-tuned models of 2.6--8.0\,B parameters on a single
 free-tier NVIDIA T4 under 4-bit NF4 quantisation~\cite{dettmers2023}. The hosted
 tier accesses Llama-3.3-70B and the commercial tier Gemini 3.1 Flash-Lite,
-both through free API tiers. A ninth prompted model was attempted and failed the
-reportability gate below; its predictions remain in the raw store but enter no
-table.
+both through free API tiers. A ninth prompted model was attempted but returned only 21 items per cell and
+failed the reportability gate below; its predictions stay in the raw store and
+enter no table.
 
 \begin{table}[t]
 \caption{The twelve model configurations. Gemini's parameter count is
@@ -486,10 +488,10 @@ comparisons, encoders win 67 and lose \emph{none}
 
 \begin{table*}[t]
 \caption{RQ1---in-domain \Fm{} for all twelve configurations. Best per column in
-bold; ``---'' marks a cell below the reportability gate or not run. Encoder
-cells are 5-fold cross-validated over all items ($n$ = 968, 968, 444, 353, 433,
-524); prompted cells are stratified samples of the same items ($n$ = 59--960),
-so all comparisons in Fig.~\ref{fig:inversion} are paired item-for-item.}
+bold; ``---'' marks a cell below the reportability gate or not run. Encoder cells
+are 5-fold cross-validated over all items ($n$ = 968, 968, 444, 353, 433, 524);
+prompted cells are stratified samples of those same items, so every comparison in
+Fig.~\ref{fig:inversion} is paired item-for-item.}
 \label{tab:indomain}
 \centering
 \footnotesize
@@ -575,8 +577,9 @@ it as the obvious next step.
 encoder labels items at a rate pulled toward the base rate of the corpus it was
 \emph{trained} on. (b) The consequence: security-class precision collapses while
 recall is largely preserved---the signature of prior shift, not of unfamiliar
-vocabulary. (c) The prompted models have the same defect from another source:
-their FR/NFR accuracy ranks with how badly they mis-set the prior.}
+vocabulary. (c) The prompted models have the same defect from another
+source: on FR/NFR every one of them under-predicts the NFR class, and the closer
+a model's predicted share is to the true rate the better it scores.}
 \label{fig:prior}
 \end{figure}
 
@@ -588,10 +591,9 @@ defect there---arriving by a different route.
 
 \emph{Prompted models also mis-set the prior, and it explains most of their
 error.} On FR/NFR the true NFR share is 54.2\%, yet every prompted model
-predicts NFR far less often---from 14.9\% (Qwen2.5-3B) to 43.4\%
-(Llama-3.3-70B)---and their accuracies rank almost exactly with that
-miscalibration (Spearman $\rho = 0.95$ over the eight reportable models,
-Fig.~\ref{fig:prior}\,(c)). The small open models' apparent ``collapse'' on
+under-predicts it---from 14.9\% (Qwen2.5-3B) to 43.4\% (Llama-3.3-70B)---and accuracy tracks that shortfall almost exactly: predicted share and accuracy
+rank together at Spearman $\rho = 0.95$ over the eight reportable models
+(Fig.~\ref{fig:prior}\,(c)). The small open models' apparent ``collapse'' on
 FR/NFR is thus not an inability to read the requirement but a systematic bias
 toward answering \textsc{fr}.
 
@@ -683,15 +685,14 @@ transfers.
 
 \textbf{Contamination cuts in our favour.} Both corpora are old, small and
 public, so prompted in-domain scores may be inflated by pre-training
-contamination~\cite{sainz2023}. That bias \emph{overstates} the prompted models
-in-domain---exactly where we report the encoders winning---so the observed
-encoder advantage is conservative; and it cannot produce the cross-dataset
-reversal, since it would help the prompted models in both regimes equally.
+contamination~\cite{sainz2023}. That bias \emph{overstates} the prompted models in-domain---exactly where we
+report the encoders winning---so the encoder advantage is conservative; and it
+cannot produce the cross-dataset reversal, since it would help them in both
+regimes equally.
 
 \textbf{Availability.} The pipeline, the frozen splits, the full prediction store
-and the scripts that regenerate every table and figure from it are public; splits
-are hash- and seed-pinned and scoring is a pure function of the stored raw
-outputs, so every number reproduces without re-running a model.
+and the scripts that regenerate every table and figure from it are public; because scoring is a pure function of the stored raw outputs, every
+number here reproduces without re-running a model.
 
 %% ===========================================================================
 \section{Threats to Validity}
@@ -720,23 +721,20 @@ sentence---so the cross-dataset arm carries definitional as well as
 distributional shift, on one corpus pair. Results cover English requirements and
 one NFR taxonomy.
 
-\textbf{Conclusion.} All paired tests are exact and multiplicity-corrected as one
-family, and the frozen splits are stored once and never regenerated because
-grouped-fold membership is library-version dependent.
+\textbf{Conclusion.} All paired tests are exact and corrected as a single
+family.
 
 %% ===========================================================================
 \section{Conclusion}
 %% ===========================================================================
 
-\looseness=-1 Twelve configurations, three tasks, three regimes: 76{,}115
-predictions scored under one strict rule, with 260 paired tests corrected as one
-family. In-domain the encoders are never significantly beaten; across corpora the
-prompted models win 48 of 64; and encoders stay an order of magnitude cheaper.
-Both families carry an uncalibrated class prior---the encoder from its training
-corpus, the prompted model from the wording of the question. Two protocols the
-field treats as interchangeable therefore return opposite rankings from the same
-data---so an in-distribution score is not a partial answer, it can be the wrong
-one.
+\looseness=-1 In-domain the fine-tuned encoders are never significantly beaten;
+across corpora the prompted models win 48 of the 64 paired tests; and encoders
+stay an order of magnitude cheaper. Both families carry an uncalibrated class
+prior---the encoder from its training corpus, the prompted model from the wording
+of the question. Two protocols the field treats as interchangeable
+therefore return opposite rankings from the same data: an in-distribution score
+is not a partial answer---it can be the wrong one.
 
 \balance
 \begin{thebibliography}{00}
