@@ -23,7 +23,9 @@ Requires `IEEEtran`, `booktabs`, `tikz`, `pifont`, `balance`, `microtype`
 | `figures/fig_prior_shift.pdf` | Fig. 4, the shared failure mode (three panels) |
 | `figures/fig_cost.pdf` | Fig. 5, Pareto frontier and break-even |
 | `tables/*.tex` | generated `tabular` bodies, `\input` at table-body level |
+| `Paper.docx` | Word version of the same paper, generated from `main.tex` |
 | `scripts/make_figs.py` | regenerates the three data figures |
+| `scripts/tex2docx.py` | rebuilds `Paper.docx` from `main.tex` (see below) |
 | `scripts/make_tables.py` | regenerates the numeric table bodies (`tab_cost.tex` is produced but the paper folds that table into prose) |
 
 Fig. 2 (the prompt template) is set inline in `main.tex`.
@@ -67,3 +69,23 @@ Figures use the Okabe–Ito-derived four-colour categorical set
 local open-weight / commercial). It passes the lightness-band, chroma, CVD-separation
 and normal-vision checks, and every tier additionally carries a marker shape or hatch
 so the figures stay readable in greyscale.
+
+
+## The Word version
+
+`Paper.docx` is generated from `main.tex`, not retyped, so its text is exactly
+the paper's text. Rebuild it with:
+
+```bash
+cd build_docx && python3 ../paper/scripts/tex2docx.py
+```
+
+The script expands `\input`, resolves `\cite`/`\ref` to the numbers LaTeX
+assigns, converts inline math to Unicode, parses the `booktabs` tabulars into
+Word tables, and lays the result out in two columns with single-column
+breakouts for the full-width figure and results table. It expects the figure
+PNGs (`fig1_architecture.png` and the three data figures, rendered at 320 dpi
+from the PDFs) beside it.
+
+Needs `python-docx`; `pandoc` and `libreoffice-writer` are only used to check
+the output.
