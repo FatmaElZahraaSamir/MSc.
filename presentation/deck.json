@@ -1,0 +1,1657 @@
+{
+ "slides": [
+  {
+   "id": "title",
+   "layout": "title",
+   "title": "Fine-Tuned Encoders or Prompted LLMs for Requirements Classification? The Verdict Inverts Under Distribution Shift",
+   "subtitle": "Fatma El-Zahraa Samir · Khaled T. Wassif · Lamia AbouZeid — Faculty of Computers and Artificial Intelligence, Cairo University, Giza, Egypt\nMSc thesis committee presentation — September 2026",
+   "notes_ar": "أهلاً بحضراتكم، وشكراً على وقتكم. النهارده هعرض شغل الرسالة، وعنوانها: Fine-Tuned Encoders or Prompted LLMs for Requirements Classification? The Verdict Inverts Under Distribution Shift. الشغل ده عملته تحت إشراف د. خالد وصيف ود. لمياء أبو زيد، في كلية الحاسبات والذكاء الاصطناعي، جامعة القاهرة.\n\nالسؤال اللي بنسأله بسيط: لو عايزين نصنّف متطلبات البرمجيات أوتوماتيك، نستخدم encoder صغير زي BERT بنعمله fine-tuning على داتا معلّمة، ولا نستخدم LLM كبير بنسأله بالـ prompt من غير أي تدريب؟ الأدبيات الحديثة بتقول إن الـ prompting وصل لنفس المستوى، وإن المشكلة اتحلّت.\n\nاللي هنوريه النهارده إن الحكم ده بيعتمد على طريقة التقييم نفسها. لما بنقيس على نفس الكوربس اللي الموديل اتدرّب عليه، الـ encoders بتكسب. ولما ننقل الموديل لكوربس تاني، الحكم بيتقلب بالكامل: نفس الموديلات، نفس العناصر، نفس طريقة التصحيح، ونتيجة عكسية.\n\nوعشان الكلام ده يبقى موثوق، كل مقارنة عندنا paired، يعني الموديلين بيتقارنوا على نفس الـ items بالظبط. وكل الاختبارات متصحّحة إحصائياً كعيلة واحدة، والـ splits متجمّدة ومحفوظة بالـ hash، فأي حد يقدر يعيد كل رقم. هنبني الحجة دي خطوة بخطوة.\n\nلو سألوك: إيه الرسالة في جملة واحدة؟ — إن الترتيب اللي بيطلع من أي benchmark هو خاصية لنظام التقييم مش للموديلات، وعشان كده الـ regime لازم يتقال كجزء من الادعاء.",
+   "sources": [
+    "main.tex:50-56"
+   ]
+  },
+  {
+   "id": "roadmap",
+   "layout": "flow",
+   "title": "How the argument is built",
+   "flow": [
+    {
+     "step": "The gap",
+     "detail": "'Solved' rests on in-distribution evaluation; cost unmeasured; corpora reused"
+    },
+    {
+     "step": "Three RQs",
+     "detail": "In-domain (RQ1), distribution shift (RQ2), accuracy vs cost (RQ3)"
+    },
+    {
+     "step": "Design",
+     "detail": "12 configurations, 1,412 requirements, 3 tasks, 3 regimes, one strict scorer"
+    },
+    {
+     "step": "RQ1 in-domain",
+     "detail": "Encoders win 67 of 106 paired tests, lose none"
+    },
+    {
+     "step": "RQ2 shift",
+     "detail": "Cross-dataset: prompted models win 48 of 64; class-weighted BERT loses 42.8%"
+    },
+    {
+     "step": "Mechanism",
+     "detail": "One uncalibrated class prior, three sources"
+    },
+    {
+     "step": "RQ3 and limits",
+     "detail": "Cost frontier, decision rule, threats to validity, conclusion"
+    }
+   ],
+   "takeaway": "Same corpora, same items, same scorer — two evaluation protocols, opposite rankings.",
+   "notes_ar": "دي خريطة العرض، سبع خطوات بتبني على بعضها.\n\nالأول، الفجوة: الادعاء إن المشكلة اتحلّت مبني على تقييم in-distribution، يعني الموديل بيتقاس على نفس الكوربس اللي اتدرّب أو اتظبط عليه. والتكلفة مش بتتقاس، ونفس الكوربسات بتتعاد.\n\nالتاني، تلات أسئلة بحثية: RQ1 عن الأداء in-domain، وRQ2 عن اللي بيحصل تحت distribution shift، يعني لما التوزيع بين التدريب والاختبار يتغيّر، وRQ3 عن الدقة مقابل التكلفة.\n\nالتالت، التصميم: 12 configuration، 1,412 متطلب، 3 تاسكات، 3 أنظمة تقييم، وscorer واحد صارم للكل. ده مهم لأنه بيخلّي كل مقارنة على نفس العناصر بالظبط.\n\nالرابع والخامس هما النتيجة: in-domain الـ encoders بتكسب 67 من 106 اختبار paired ومش بتخسر ولا واحد. وcross-dataset الـ prompted models بتكسب 48 من 64، وأحسن encoder بيخسر 42.8% من الـ macro-F1 بتاعه.\n\nالسادس، الآلية: السبب مش كلمات جديدة، السبب class prior غير معاير، والـ prior يعني نسبة الـ class في الداتا، وبيجي من تلات مصادر.\n\nالسابع، التكلفة وقاعدة القرار والحدود والخلاصة.\n\nالأرقام التلاتة اللي عايزة حضراتكم تفتكروها: 67 من 106، و48 من 64، ونفس الموديلات ونفس العناصر ونفس الـ scorer.\n\nلو سألوك: ليه بتقولي inverts مش drops؟ — لأن الاتجاه نفسه اتعكس: مش إن الكل نزل، ده اللي كان كسبان بقى خسران على نفس العناصر.",
+   "sources": [
+    "main.tex:60-82",
+    "main.tex:123-160",
+    "main.tex:483-485",
+    "main.tex:521-529",
+    "main.tex:624-629"
+   ]
+  },
+  {
+   "id": "task-headline",
+   "layout": "bullets",
+   "title": "The task, and the field's headline: 'essentially solved'",
+   "bullets": [
+    "Assign requirement statements to categories: functional (FR) vs non-functional (NFR); security-relevant vs not",
+    "Right: early risk identification and architectural choice; wrong: rework propagating downstream",
+    "Four waves: indicator terms (2007) → engineered features → fine-tuned transformers (NoRBERT) → prompted LLMs (2024)",
+    "Headline: encoders, commercial LLMs, well-prompted small open models all report high-80s to mid-90s",
+    "Several studies conclude prompting can replace supervision outright (Binkhonain & Alfayaz 2025; Tang et al. 2025)"
+   ],
+   "stats": [
+    {
+     "value": "4",
+     "label": "waves of automation since 2007"
+    },
+    {
+     "value": "high 80s – mid 90s",
+     "label": "reported macro-F1 / accuracy"
+    },
+    {
+     "value": "2024",
+     "label": "prompted generative LLMs take over"
+    }
+   ],
+   "takeaway": "This thesis asks whether that headline survives when the evaluation convention behind it is changed.",
+   "notes_ar": "التاسك في شكله بسيط. عندنا جملة متطلب، وعايزين نقول هي functional، يعني حاجة النظام لازم يعملها، ولا non-functional، يعني جودة أو قيد زي الأداء أو الأمن أو سهولة الاستخدام. وفي تاسك تاني: المتطلب ده له علاقة بالأمن ولا لأ.\n\nليه ده مهم؟ لأن التصنيف الصح بيساعد في تحديد المخاطر بدري وفي اختيار الـ architecture، والغلط بيتحوّل لـ rework في المراحل اللي بعده.\n\nالمجال مرّ بأربع موجات. الأولى كلمات دالة موزونة، ودي اللي طلّعت كوربس PROMISE سنة 2007. بعدها الـ machine learning الكلاسيكي على features مصمّمة يدوي. بعدها الـ transformers المتدرّبة، وأهمها NoRBERT اللي عمل fine-tuning لـ BERT ووصل لـ macro-F1 في منتصف التسعينات. والـ macro-F1 يعني متوسط الـ F1 لكل class بالتساوي، فالـ class الصغير بيتحسب زي الكبير. ومن 2024 الـ prompting للـ LLMs التوليدية بقى هو السايد.\n\nوالـ headline في المجال دلوقتي إن المشكلة اتحلّت تقريباً: الـ encoders والـ LLMs التجارية وحتى الموديلات المفتوحة الصغيرة كلها بتبلّغ عن أرقام بين أواخر الثمانينات ومنتصف التسعينات. وفي دراسات بتستنتج إن الـ prompting يقدر يستغنى عن الـ supervision خالص، يعني مش محتاجين داتا معلّمة.\n\nده الادعاء اللي هنختبره: هل الـ headline ده بيصمد لو غيّرنا طريقة التقييم اللي مبني عليها؟\n\nلو سألوك: هو فيه شك إن الأرقام دي صح؟ — لأ، الأرقام صح على الـ protocol بتاعها. سؤالنا عن الـ protocol نفسه، مش عن الأرقام.",
+   "sources": [
+    "main.tex:93-110",
+    "main.tex:166-178"
+   ]
+  },
+  {
+   "id": "gap",
+   "layout": "bullets",
+   "title": "The evaluation gap: what the field does not measure",
+   "bullets": [
+    "Almost every result is in-distribution: tuned or exemplars selected on the corpus it is scored on",
+    "'Generalisability' in prior work means transfer across tasks on the same corpora — not unseen projects",
+    "NoRBERT itself was motivated by classifiers over-fitting project-specific wording — a fragility then left unmeasured",
+    "Only the app-review study tests different text: markedly lower precision, an unexplained signal never followed up",
+    "Cost, latency and model size seldom quantified — yet they decide adoptability without an API budget",
+    "Same two or three small, ageing public corpora everywhere — contamination acknowledged, never addressed"
+   ],
+   "takeaway": "In-distribution parity is exactly what contamination and corpus reuse would produce spuriously — the settling comparison had not been run.",
+   "notes_ar": "الأرقام اللي شفناها في الشريحة اللي فاتت كلها مبنية على convention واحد: التقييم in-distribution. يعني نفس الكوربس اللي الموديل بيتدرّب عليه، أو اللي بتتاخد منه أمثلة الـ few-shot، هو نفسه اللي بيتقاس عليه.\n\nولما دراسة بتقول إنها قاست generalisability، غالباً بتقصد نقل بين التاسكات على نفس الكوربسين، مش نقل لمشاريع جديدة أو لكوربس مستقل. والمفارقة إن NoRBERT نفسه، الـ baseline الأساسي في المجال، كان الدافع وراه إن الـ classifiers بتعمل over-fitting على صياغة كل مشروع. الهشاشة دي اتقالت واتسابت من غير قياس.\n\nالدراسة الوحيدة اللي جرّبت نص مختلف فعلاً هي دراسة الـ app reviews، وسجّلت precision أقل بشكل واضح على كذا فئة. الإشارة دي محدش رجع يفسّرها.\n\nالفجوة التانية: التكلفة والـ latency وحجم الموديل نادراً بيتقاسوا، مع إنهم اللي بيحدّدوا هل التقنية ممكن تتبنّى من غير ميزانية API.\n\nوالتالتة: نفس الكوربسات الصغيرة القديمة موجودة في كل النتائج تقريباً، فاحتمال إن الـ LLM شاف الداتا دي في الـ pre-training، وده اسمه contamination، احتمال حقيقي بيتذكر ومحدش بيعالجه.\n\nوالنقطة الأهم: الفجوات دي مش مستقلة. التعادل in-distribution هو بالظبط اللي الـ contamination وإعادة استخدام الكوربس هينتجوه بالصدفة. فالمقارنة اللي تحسم السؤال ما اتعملتش. وده اللي إحنا عملناه.\n\nلو سألوك: طب الـ contamination مش هتأثر على نتايجكم إنتم كمان؟ — لو موجودة، هي بتزوّد الـ prompted models في النظامين بالتساوي، فمش هتقدر تنتج انقلاب بين نظامين. وهنرجع للنقطة دي في الـ discussion.",
+   "sources": [
+    "main.tex:111-121",
+    "main.tex:198-216"
+   ]
+  },
+  {
+   "id": "coverage",
+   "layout": "table",
+   "title": "Evaluation coverage of recent LLM studies (2024–2026)",
+   "table": {
+    "headers": [
+     "Study",
+     "Open LLMs",
+     "Comm. LLMs",
+     "Cross-project",
+     "Cross-dataset",
+     "Cost"
+    ],
+    "rows": [
+     [
+      "El-Hajjami et al. 2024",
+      "✗",
+      "✓",
+      "✗",
+      "✗",
+      "✗"
+     ],
+     [
+      "Peer et al. 2024",
+      "✗",
+      "✓",
+      "✗",
+      "✗",
+      "~"
+     ],
+     [
+      "Binkhonain & Alfayaz 2025",
+      "✓",
+      "✓",
+      "✗",
+      "✗",
+      "✗"
+     ],
+     [
+      "Alhoshan et al. 2025",
+      "✓",
+      "✗",
+      "✗",
+      "✗",
+      "✗"
+     ],
+     [
+      "Tang et al. 2025",
+      "✓",
+      "✓",
+      "✗",
+      "✗",
+      "✗"
+     ],
+     [
+      "Chaudhary et al. 2025",
+      "✗",
+      "✓",
+      "✗",
+      "~",
+      "✗"
+     ],
+     [
+      "Vasudevan et al. 2026",
+      "✗",
+      "✓",
+      "✗",
+      "✗",
+      "✗"
+     ],
+     [
+      "Levy et al. 2026",
+      "✓",
+      "✓",
+      "✗",
+      "✗",
+      "✗"
+     ],
+     [
+      "This paper",
+      "✓",
+      "✓",
+      "✓",
+      "✓",
+      "✓"
+     ]
+    ]
+   },
+   "bullets": [
+    "'Cross-project' = held-out unseen projects; 'cross-dataset' = an independently produced corpus; ~ = partially reported"
+   ],
+   "takeaway": "No prior study reports cross-project or cross-dataset transfer together with cost; this paper reports all five axes.",
+   "notes_ar": "الجدول ده هو Table I في الورقة. فيه 8 دراسات حديثة من 2024 لـ 2026، وبنقيّم كل واحدة على خمس محاور: هل استخدمت LLMs مفتوحة، هل استخدمت LLMs تجارية، هل عملت cross-project، هل عملت cross-dataset، وهل قاست التكلفة.\n\nخلّيني أوضّح المصطلحين: cross-project يعني إن الاختبار على مشاريع كاملة الموديل ما شافهاش في التدريب. وcross-dataset يعني الاختبار على كوربس اتعمل بشكل مستقل، بناس تانيين وبتعريف تاني.\n\nبصّوا على عمود cross-project: كله ✗. مفيش دراسة واحدة اختبرت على مشاريع غير مشوفة. عمود cross-dataset: كله ✗ ماعدا علامة جزئية عند Chaudhary et al.، ودي دراسة الـ app reviews اللي ذكرتها. وعمود التكلفة: كله ✗ ماعدا إشارة جزئية عند Peer et al.\n\nأما الموديلات فالتغطية أحسن: معظم الدراسات جرّبت LLMs تجارية، وكام واحدة جرّبت مفتوحة. يعني الفجوة مش في الموديلات، الفجوة في طريقة التقييم.\n\nالسطر الأخير هو ورقتنا: الأعمدة الخمسة كلها ✓. وده مش عشان نملى جدول، ده لأن الأعمدة التلاتة الناقصة، cross-project وcross-dataset والتكلفة، هي بالظبط اللي بتحدّد إذا كانت النتيجة هتتنقل للواقع ولا لأ.\n\nلو سألوك: ليه ما دخّلتيش دراسات أقدم زي NoRBERT في الجدول؟ — الجدول مخصوص للدراسات اللي بتقيّم LLMs بالـ prompting من 2024، لأن دي اللي بتبني عليها الادعاء إن المشكلة اتحلّت.",
+   "sources": [
+    "main.tex:218-245",
+    "main.tex:180-196",
+    "main.tex:754-772"
+   ]
+  },
+  {
+   "id": "rqs",
+   "layout": "bullets",
+   "title": "Three research questions",
+   "bullets": [
+    "RQ1 — How do open and commercial LLMs compare with fine-tuned encoders in-domain?",
+    "RQ2 — How much is lost cross-project and cross-dataset, and does the loss differ by model class?",
+    "RQ3 — What is the accuracy-versus-cost trade-off, and the cheapest freely available option that is good enough?",
+    "Design principle: hold corpus, items, label sets and scoring rule fixed",
+    "Vary only the distribution shift between what a model is tuned on and scored on"
+   ],
+   "stats": [
+    {
+     "value": "3",
+     "label": "research questions"
+    },
+    {
+     "value": "1",
+     "label": "independent variable: distribution shift"
+    }
+   ],
+   "takeaway": "RQ1 reproduces the field's convention; RQ2 repairs the first omission (shift); RQ3 repairs the second (cost).",
+   "notes_ar": "الشغل ده بيتنظم حوالين تلات أسئلة بحثية.\n\nRQ1: الموديلات اللغوية الكبيرة، المفتوحة والتجارية، بتقارن إزاي بالـ encoders المدرّبة لما نقيس in-domain؟ وin-domain يعني الموديل بيتدرّب وبيتقاس على نفس الكوربس، وده الأسلوب المعتاد في المجال.\n\nRQ2: بنخسر قد إيه لما نقيس cross-project وcross-dataset، وهل الخسارة بتختلف حسب نوع الموديل؟ cross-project يعني بنحجز مشاريع كاملة الموديل ما شافهاش، وcross-dataset يعني بندرّب على كوربس ونختبر على كوربس تاني مستقل خالص.\n\nRQ3: إيه الـ trade-off بين الدقة والتكلفة، وإيه أرخص خيار مجاني كفاية للاستخدام الفعلي؟\n\nومبدأ التصميم اللي ماشي على طول الدراسة بسيط: إحنا بنثبّت الكوربس والـ items والـ label sets وقاعدة الـ scoring، وبنغيّر حاجة واحدة بس، وهي مقدار الـ distribution shift بين اللي الموديل اتدرّب عليه واللي بيتقاس عليه. الـ distribution shift يعني الفرق بين توزيع الداتا وقت التدريب وتوزيعها وقت الاختبار. ده اللي بيخلّي المقارنة نضيفة، لأن أي فرق في النتيجة نقدر نرجّعه لمتغير واحد بس.\n\nRQ1 بيعيد اللي المجال بيعمله على نفس الإعداد، وRQ2 بيصلّح أول نقص وهو الـ shift، وRQ3 بيصلّح تاني نقص وهو التكلفة.\n\nلو سألوك: ليه RQ1 أصلاً لو المجال عمله قبل كده؟ لأنه الـ reference arm؛ لازم نثبت الأول إننا بنعيد نتيجة المجال على نفس الإعداد وبنفس الـ items، وبعدين نورّي إن النتيجة دي بتنقلب لما الـ shift يزيد.",
+   "sources": [
+    "main.tex:123-126",
+    "main.tex:155-160"
+   ]
+  },
+  {
+   "id": "contributions",
+   "layout": "bullets",
+   "title": "Four contributions",
+   "bullets": [
+    "1. Paired, multiplicity-controlled benchmark: 12 configurations, 3 tasks, 2 corpora, 3 regimes; 76,115 predictions; 260 McNemar tests",
+    "2. The inversion: 67 wins / 39 ties / 0 losses in-domain → 3 / 13 / 48 cross-dataset; best encoder −42.8%",
+    "3. Mechanism: base-rate shift, not lexical novelty — precision collapses, recall holds; prompted models share it (ρ = 0.95)",
+    "4. Accuracy–cost frontier: $0.0024 vs $0.0216–$0.1132 per 1,000; training repaid within 46–552 items, all 276 pairings"
+   ],
+   "takeaway": "The ranking a benchmark reports is a property of the regime it evaluates, not of the models.",
+   "notes_ar": "الورقة بتقدّم أربع مساهمات، وهعرض كل واحدة بالتفصيل في الأجزاء الجاية.\n\nالأولى: benchmark مزدوج ومصحّح إحصائياً. اتناشر configuration: أربع encoders مدرّبة وتمن LLMs prompted على تلات مستويات، محلي وhosted وتجاري، على تلات tasks وكوربسين وتلات regimes. 76,115 prediction اتقاسوا مرة واحدة بقاعدة strict واحدة، و260 اختبار McNemar. McNemar يعني بيقارن موديلين على نفس العناصر بالظبط ويشوف مين غلط فين، وpaired يعني نفس الـ items للاتنين. والـ 260 اتصحّحوا كـ family واحدة، لأن إحنا عاملين تجارب كتير ومش عايزين نتيجة تطلع significant بالصدفة.\n\nالتانية: الانقلاب. in-domain الـ encoders كسبت 67 وتعادلت 39 وما خسرتش ولا مرة. تحت cross-dataset نفس المقارنات بقت 3 و13 و48، وأقوى encoder خسر 42.8% من الـ macro-F1 بتاعه. macro-F1 يعني متوسط الـ F1 لكل class بالتساوي، فالـ class الصغير بيتحسب زي الكبير.\n\nالتالتة: آلية، مش مجرد فجوة. الانهيار سببه base-rate shift مش مفردات جديدة. الـ base rate يعني نسبة الـ class في الداتا. الـ encoder المنقول بيعيد نسبة الكوربس اللي اتدرّب عليه، فالـ precision بينهار والـ recall ثابت. والموديلات الـ prompted عندها نفس العيب من مصدر مختلف: دقتها بتترتّب مع قد إيه بتغلط في النسبة دي، بارتباط ρ يساوي 0.95.\n\nالرابعة: حدود الدقة مقابل التكلفة. الـ encoders بـ 0.0024 دولار لكل ألف تصنيف مقابل 0.0216 لـ 0.1132 للـ prompted، والتدريب بيطلّع تمنه بعد 46 لـ 552 item في كل الـ 276 pairing اللي قسناها.\n\nالرسالة: الترتيب اللي أي benchmark بيطلّعه هو خاصية للـ regime اللي بيقيّم فيه، مش للموديلات نفسها.\n\nلو سألوك: إيه الجديد مقارنة بـ Binkhonain وAlfayaz؟ هما قاسوا in-distribution بس ومن غير تكلفة؛ إحنا ضفنا cross-project وcross-dataset والتكلفة، على نفس الـ items وبنفس الـ scorer وبتصحيح إحصائي.",
+   "sources": [
+    "main.tex:128-153"
+   ]
+  },
+  {
+   "id": "sec-design",
+   "layout": "section",
+   "title": "Part I — Study design",
+   "subtitle": "One data spine, two model arms, one strict scoring spine — and a regime axis only the encoders traverse",
+   "notes_ar": "دلوقتي ندخل الجزء الأول: تصميم الدراسة. النقطة الأساسية هنا إن كل حاجة اتثبّتت قبل ما أي موديل يتقاس.\n\nعندنا عمود بيانات واحد: الكوربس والـ splits المتجمّدة. وعندنا ذراعين للموديلات: الـ encoders اللي بتتدرّب، والـ LLMs اللي بتتسأل بـ prompt. وعندنا عمود scoring واحد strict، الاتنين بيعدّوا منه بنفس القاعدة. وفيه محور للـ regimes، وده المحور اللي الـ encoders بس هي اللي بتتحرّك عليه، لأن الـ prompted models ما عندهاش training data أصلاً، فنتيجتها ثابتة عبر الـ regimes.\n\nالفكرة إن الترتيب ده، إننا نجمّد الداتا والـ splits والـ scorer قبل أي قياس، هو اللي بيخلّي كل مقارنة بعد كده paired، ومحدش يقدر يقول إن النتيجة جت من اختلاف في الإعداد.\n\nالشرايح الجاية هتمشي على المعمار ده خطوة خطوة: الكوربس، الـ tasks، الـ regimes، الموديلات، الـ prompt، الـ parsing، الـ metrics والـ significance، وبعدين نموذج التكلفة.\n\nلو سألوك: ليه الـ prompted arm ما بيتحرّكش على محور الـ regime؟ لأنه ما بيستهلكش training folds، فهو بيشتغل كخط مرجعي ثابت بنقيس عليه هبوط الـ encoders لما الـ shift يزيد.",
+   "sources": [
+    "main.tex:248-260",
+    "figures/fig_architecture.tex:1-4"
+   ]
+  },
+  {
+   "id": "architecture",
+   "layout": "figure",
+   "title": "Experimental architecture",
+   "figure": "architecture",
+   "bullets": [
+    "Data spine: PROMISE_exp 969→968 (47 projects) + SecReq 510→444 (3 specifications) → 1,412 requirements, 50 groups",
+    "Frozen splits: 14 families, 107 folds, seed 42, SHA-256-pinned ids",
+    "Two arms, one difference — training data: encoders re-fitted per regime, 8 LLMs never fitted",
+    "One strict scoring spine: identical items; unparseable = wrong; 76,115 predictions; gate 81 of 87 cells",
+    "Seven stages, each writing a content-hashed artefact — every Results number is read back from those artefacts"
+   ],
+   "takeaway": "The band beneath the figure — in-domain → cross-project → cross-dataset — is the study's independent variable.",
+   "notes_ar": "ده معمار الدراسة كاملة، وهمشي عليه من الشمال لليمين.\n\nعلى الشمال عمود البيانات: PROMISE_exp من 969 لـ 968 requirement في 47 مشروع، وSecReq من 510 لـ 444 في تلات مواصفات صناعية. بيتدمجوا في كوربس موحّد 1,412 requirement في 50 مجموعة مشاريع. بعدها الـ splits المتجمّدة: 14 عيلة، 107 fold، seed 42، والـ ids مربوطة بـ SHA-256 للملف الأصلي. يعني أي حد يعيد التجربة هياخد نفس التقسيم بالظبط.\n\nفي النص ذراعين للموديلات، بيختلفوا في حاجة واحدة بس: هل بيستهلكوا training data ولا لأ. الـ encoder arm، BERT وRoBERTa بـ class weighting أو من غيره، بتتدرّب من جديد عند كل نقطة على محور الـ regime. الـ prompted arm، تمن LLMs على تلات مستويات، عمرها ما بتتدرّب.\n\nعلى اليمين عمود الـ scoring الواحد: نفس الـ test items للاتنين، وردود الـ LLMs بتتعمل لها parsing، وأي رد مش مفهوم بيتحسب غلط. 76,115 prediction، والـ gate عدّى 81 من 87 cell. وبعدها التحليل: macro-F1 مع bootstrap CI، 260 اختبار McNemar paired، تصحيح Holm وBH، والتكلفة مع نقطة الـ break-even.\n\nالشريط اللي تحت هو المتغير المستقل: in-domain، بعدين cross-project، بعدين cross-dataset، يعني الـ shift بيزيد خطوة خطوة.\n\nوالبايبلاين سبع مراحل، كل مرحلة بتكتب artefact بـ content hash، وكل رقم في الـ Results بيتقري من الـ artefacts دي، مش بيتكتب بالإيد. ده اللي بيخلّي الشغل reproducible.\n\nلو سألوك: إزاي تضمني إن المقارنة paired فعلاً؟ لأن الاتنين بياخدوا نفس الـ items من نفس الـ split file، والمحاذاة بتتم بـ requirement id مش بالمكان في القايمة.",
+   "sources": [
+    "main.tex:252-262",
+    "figures/fig_architecture.tex:25-28",
+    "figures/fig_architecture.tex:35-36",
+    "figures/fig_architecture.tex:42-43",
+    "figures/fig_architecture.tex:50-66",
+    "figures/fig_architecture.tex:69-74"
+   ]
+  },
+  {
+   "id": "corpus",
+   "layout": "table",
+   "title": "Corpus: 1,412 requirements with a three-fold base-rate contrast",
+   "table": {
+    "headers": [
+     "Corpus",
+     "Raw",
+     "Final",
+     "Groups",
+     "FR / NFR",
+     "Security prevalence"
+    ],
+    "rows": [
+     [
+      "PROMISE_exp (Lima et al. 2019)",
+      "969",
+      "968",
+      "47",
+      "444 / 524",
+      "12.9%"
+     ],
+     [
+      "SecReq (Knauss et al. 2011)",
+      "510",
+      "444",
+      "3",
+      "—",
+      "39.9%"
+     ],
+     [
+      "Unified",
+      "1,479",
+      "1,412",
+      "50",
+      "444 / 524",
+      "21.4%"
+     ]
+    ]
+   },
+   "bullets": [
+    "Texts normalised, exact duplicates removed — 67 rows, none shared between corpora; SecReq = three industrial security specifications",
+    "Splits generated once (seed 42), ids pinned to each source file's SHA-256; consumed, never regenerated"
+   ],
+   "takeaway": "Security is 12.9% of PROMISE_exp but 39.9% of SecReq — that contrast, not vocabulary, drives the main result.",
+   "notes_ar": "الكوربس مبني من مصدرين عامّين.\n\nPROMISE_exp بتاع Lima وزملاؤه 2019: 969 requirement خام، بعد التنضيف 968، في 47 مشروع، فيه 444 FR و524 NFR، ونسبة الأمن فيه 12.9%. SecReq بتاع Knauss وزملاؤه 2011: 510 خام، بعد التنضيف 444، في تلات مواصفات أمنية صناعية، ونسبة الأمن فيه 39.9%. مع بعض: 1,479 خام بقوا 1,412 في 50 مجموعة، ونسبة الأمن الموحّدة 21.4%.\n\nالتنضيف: النصوص اتعملها normalisation وشيلنا التكرارات المطابقة، 67 صف، ومفيش ولا واحد منهم مشترك بين الكوربسين، يعني مفيش تسريب بين الاتنين. الـ splits اتعملت مرة واحدة بـ seed 42، والـ ids مربوطة بالـ SHA-256 بتاع كل ملف مصدر. وإحنا بنستهلك ملف الـ split، عمرنا ما بنعيد توليده، لأن عضوية الـ grouped folds بتتغيّر مع نسخة المكتبة. grouped folds يعني المشروع كله بيروح لجهة واحدة، يا training يا test، مش بيتقسم بينهم.\n\nالخاصية الحاسمة في الجدول ده هي عمود الـ prevalence، يعني نسبة الـ class الموجب في الداتا: الأمن 12.9% في PROMISE_exp مقابل 39.9% في SecReq، فرق تلات مرات لنفس المفهوم اللي الكوربسين بيعلّموه بشكل مستقل. الفرق ده، مش المفردات، هو اللي بيحرّك النتيجة الرئيسية اللي هنشوفها في الجزء التاني. خلّوا الرقمين دول في بالكم.\n\nلو سألوك: ليه SecReq مفيش له FR/NFR في الجدول؟ لأن SecReq معلّم على الأمن بس، والـ FR/NFR task بتستخدم الـ labels الأصلية بتاعة PROMISE_exp.",
+   "sources": [
+    "main.tex:264-277",
+    "main.tex:279-297"
+   ]
+  },
+  {
+   "id": "tasks",
+   "layout": "bullets",
+   "title": "Three task families over one unified corpus",
+   "bullets": [
+    "Binary FR/NFR — native PROMISE_exp labels (444 FR / 524 NFR)",
+    "Binary security — native in SecReq, derived from PROMISE_exp's SE sub-class: same task, two independent corpora",
+    "NFR sub-types — eleven-class Cleland-Huang taxonomy, aligned with ISO/IEC 25010 quality characteristics",
+    "Several tail classes have single-digit support → reduced top-6 and top-4 variants also evaluated",
+    "Macro-F1 always over the full declared label set: penalised for every class never predicted"
+   ],
+   "stats": [
+    {
+     "value": "524",
+     "label": "items, all-11 sub-types"
+    },
+    {
+     "value": "433",
+     "label": "items, top-6"
+    },
+    {
+     "value": "353",
+     "label": "items, top-4"
+    }
+   ],
+   "takeaway": "Security is the one task both corpora annotate — which is why cross-dataset transfer is measured on it alone.",
+   "notes_ar": "في الشغل ده إحنا عرّفنا تلات tasks على نفس الكوربس الموحّد. الأولى binary FR/NFR، ودي بالـ labels الأصلية بتاعة PROMISE_exp: 444 FR و524 NFR. التانية binary security، ودي أصلية في SecReq، لكن في PROMISE_exp إحنا اشتقّيناها من كلاس SE اللي هو sub-class جوه الـ NFR. يعني بقى عندنا نفس الـ task بالظبط على كوربسين اتعملوا بشكل مستقل عن بعض، وده الشيء اللي الـ cross-dataset arm بيستغله بعدين. التالتة NFR sub-types، وهي تصنيف الـ NFR لـ 11 كلاس حسب taxonomy بتاعة Cleland-Huang، وهي متوافقة مع خصائص الجودة في ISO/IEC 25010. بس فيه كلاسات في الديل دعمها رقم واحد بس، فعشان كده عملنا كمان نسختين مختصرتين: top-6 وtop-4. الأرقام على اليمين: 524 item لكل الـ 11 كلاس، 433 للـ top-6، و353 للـ top-4. نقطة مهمة في طريقة الحساب: الـ macro-F1 هو متوسط الـ F1 لكل class بالتساوي، فالـ class الصغير بيتحسب زي الكبير بالظبط. وإحنا دايماً بنحسبه على كل الـ label set المعلنة للنسخة، يعني لو الموديل عمره ما توقّع class معين، بيتعاقب عليه. ده أصعب من الشائع في الأدبيات، لكنه عادل لأن كل الـ 12 configuration بتتقيّم بنفس القاعدة على نفس الـ items. لو سألوك: ليه الأمن بس في الـ cross-dataset؟ لأنه الـ task الوحيد اللي الكوربسين بيعلّموه، فهو الوحيد اللي نقدر ندرّب عليه في واحد ونختبر في التاني بنفس الـ labels.",
+   "sources": [
+    "main.tex:299-310",
+    "main.tex:292-294"
+   ]
+  },
+  {
+   "id": "regimes",
+   "layout": "flow",
+   "title": "Three evaluation regimes of increasing distribution shift",
+   "flow": [
+    {
+     "step": "Frozen splits",
+     "detail": "14 split families, 107 folds, seed 42; ids pinned to SHA-256 of each source file; stored once, never regenerated"
+    },
+    {
+     "step": "In-domain",
+     "detail": "Stratified 5-fold cross-validation within one corpus — the in-distribution reference arm prior work reports"
+    },
+    {
+     "step": "Cross-project",
+     "detail": "Grouped folds holding out entire unseen project groups + leave-one-project-out over the 47 PROMISE_exp projects"
+    },
+    {
+     "step": "Cross-dataset",
+     "detail": "Train the security task on one corpus, test on the other (PROMISE_exp ↔ SecReq): identical labels, different annotation provenance"
+    }
+   ],
+   "takeaway": "Same items, same labels, same scorer at every station — only the training distribution moves.",
+   "notes_ar": "دلوقتي المتغيّر المستقل في الدراسة كلها: نظام التقييم. عندنا تلات regimes مرتّبين حسب حجم الـ distribution shift، يعني قد إيه الداتا اللي بنختبر عليها مختلفة عن اللي اتدرّبنا عليها. لكن قبل التلاتة، فيه خطوة أساسية: الـ splits مجمّدة. عندنا 14 عيلة splits فيها 107 folds، اتولّدت مرة واحدة بـ seed 42، والـ ids بتاعة كل item مربوطة بالـ SHA-256 hash بتاع الملف المصدر. الملف ده بيتقرا بس، عمره ما بيتعمل تاني، لأن عضوية الـ grouped folds بتعتمد على نسخة المكتبة اللي عملتها. ده بيضمن إن أي حد يعيد التجربة يشوف نفس الـ folds بالظبط. أول regime هو in-domain: stratified 5-fold cross-validation جوه كوربس واحد، وده المرجع اللي الشغل السابق بيبلّغ عنه. stratified يعني كل fold فيه نفس نسبة الكلاسات. التاني cross-project: بنحجز مجموعات مشاريع كاملة مش متشافة في التدريب، وكمان leave-one-project-out على الـ 47 مشروع بتوع PROMISE_exp، يعني بندرّب على كل المشاريع ماعدا واحد ونختبر عليه. التالت cross-dataset: بندرّب task الأمن على كوربس ونختبر على التاني، PROMISE_exp وSecReq في الاتجاهين. نفس الـ labels بالظبط، بس مصدر التعليق مختلف. الخلاصة: نفس الـ items، نفس الـ labels، نفس الـ scorer في كل محطة، والحاجة الوحيدة اللي بتتحرّك هي توزيع التدريب. لو سألوك: جرّبتوا seeds تانية للـ splits؟ لأ، الـ splits اتولّدت مرة واحدة واتجمّدت عن قصد، عشان كل الـ 12 configuration تتقارن على نفس الـ folds بالظبط، والـ seed والـ hash متسجّلين فأي حد يقدر يعيدها.",
+   "sources": [
+    "main.tex:269-272",
+    "main.tex:312-320"
+   ]
+  },
+  {
+   "id": "pairing",
+   "layout": "comparison",
+   "title": "Two model arms, paired on identical items",
+   "comparison": {
+    "left": {
+     "heading": "Encoder arm — consumes training folds",
+     "items": [
+      "Re-trained at every station on that station's training folds",
+      "Every requirement is a test item exactly once per encoder family — predictions cover the whole corpus",
+      "BERT and RoBERTa, with and without inverse-frequency class weighting",
+      "Their drop across regimes is the measured quantity"
+     ]
+    },
+    "right": {
+     "heading": "Prompted arm — consumes only test items",
+     "items": [
+      "No training distribution → scores regime-invariant by construction: a fixed reference line",
+      "Stratified samples of the same corpus: 300 items per binary cell, 200 per sub-type cell",
+      "Allocated in proportion to class prior, floor of ten per class; six local models also answer full frames",
+      "8 LLMs in 3 tiers; zero- and few-shot"
+     ]
+    }
+   },
+   "takeaway": "Every encoder–LLM comparison is paired on identical requirements, aligned by requirement identifier — never by position.",
+   "notes_ar": "الشريحة دي فيها الفكرة التحليلية اللي الدراسة كلها واقفة عليها. عندنا ذراعين. الـ encoder arm بيستهلك training folds: عند كل محطة بنعيد تدريبه على الـ training folds بتاعة المحطة دي. وكل requirement بيبقى test item مرة واحدة بالظبط جوه كل عيلة encoder، فتوقعات الـ encoders بتغطّي الكوربس كله. الـ encoders هم BERT وRoBERTa، كل واحد بنسخة بـ class weighting ونسخة من غير. وسقوطهم من regime للتاني هو الكمية اللي بنقيسها. الـ prompted arm على الناحية التانية مالوش training distribution خالص، بيشوف test items بس. فدرجاته ثابتة عبر الـ regimes by construction، وده معناه إنه بيشتغل كخط مرجعي ثابت نقيس عليه قد إيه الـ encoders وقعوا. الـ prompted models بتجاوب على عينات stratified من نفس الكوربس: 300 item لكل خلية binary و200 لكل خلية sub-type، موزّعة حسب نسبة كل class في الداتا، وبحد أدنى عشرة items لكل class عشان مفيش class نادر يختفي من العينة. والست موديلات المحلية بتجاوب كمان على الـ evaluation frames كاملة. عندنا 8 LLMs في تلات مستويات، zero-shot وfew-shot. وأهم جملة في الشريحة: كل مقارنة encoder مع LLM هي paired، يعني على نفس المتطلبات بالظبط، متطابقة بالـ requirement id مش بالمكان في الملف. ده اللي بيخلّي اختبار McNemar بعدين شرعي، لأن McNemar بيقارن موديلين على نفس العناصر بالظبط ويشوف مين غلط فين. لو سألوك: مش العينة أصغر من الكوربس؟ أيوه، بس المقارنة بتتعمل بس على الـ items المشتركة بين الاتنين بالـ id، فمفيش موديل بيتقيّم على حاجة التاني ماشافهاش.",
+   "sources": [
+    "main.tex:322-332",
+    "main.tex:341-345",
+    "main.tex:382-388"
+   ]
+  },
+  {
+   "id": "configs",
+   "layout": "table",
+   "title": "The twelve configurations",
+   "table": {
+    "headers": [
+     "Configuration",
+     "Checkpoint / endpoint",
+     "Params (B)",
+     "Access"
+    ],
+    "rows": [
+     [
+      "BERT (w / u)",
+      "bert-base-uncased",
+      "0.11",
+      "fine-tuned"
+     ],
+     [
+      "RoBERTa (w / u)",
+      "roberta-base",
+      "0.13",
+      "fine-tuned"
+     ],
+     [
+      "Gemma-2-2B",
+      "gemma-2-2b-it",
+      "2.61",
+      "local, 4-bit"
+     ],
+     [
+      "SmolLM3-3B",
+      "SmolLM3-3B",
+      "3.08",
+      "local, 4-bit"
+     ],
+     [
+      "Qwen2.5-3B",
+      "Qwen2.5-3B-Instruct",
+      "3.09",
+      "local, 4-bit"
+     ],
+     [
+      "Phi-4-mini",
+      "Phi-4-mini-instruct",
+      "3.84",
+      "local, 4-bit"
+     ],
+     [
+      "Qwen2.5-7B",
+      "Qwen2.5-7B-Instruct",
+      "7.62",
+      "local, 4-bit"
+     ],
+     [
+      "Llama-3.1-8B",
+      "Llama-3.1-8B-Instruct",
+      "8.03",
+      "local, 4-bit"
+     ],
+     [
+      "Llama-3.3-70B",
+      "llama-3.3-70b-versatile",
+      "70.6",
+      "hosted"
+     ],
+     [
+      "Gemini 3.1 Flash-Lite",
+      "gemini-3.1-flash-lite",
+      "n/a",
+      "commercial"
+     ]
+    ]
+   },
+   "bullets": [
+    "Local tier: six instruction-tuned models, 2.6–8.0 B, one free-tier NVIDIA T4, 4-bit NF4; hosted and commercial via free API tiers",
+    "A ninth prompted model failed the reportability gate — kept in the raw store, enters no table; Gemini's size undisclosed, recorded as unknown"
+   ],
+   "takeaway": "4 fine-tuned encoder variants + 8 prompted LLMs (6 local, 1 hosted, 1 commercial) = 12 configurations.",
+   "notes_ar": "دي الـ 12 configuration اللي في الدراسة. أول صفّين هما الـ encoders: BERT بـ bert-base-uncased وRoBERTa بـ roberta-base، حوالي 0.11 و0.13 مليار parameter، وكل واحد بنسختين w وu، يعني بوزن للكلاسات ومن غير، فدول أربع encoder variants. بعدين تمن LLMs prompted في تلات مستويات. المستوى المحلي: ست موديلات instruction-tuned من 2.6 لـ 8 مليار parameter، Gemma-2-2B وSmolLM3-3B وQwen2.5-3B وPhi-4-mini وQwen2.5-7B وLlama-3.1-8B، كلهم شغّالين على كارت T4 واحد من الـ free tier بـ 4-bit NF4 quantisation، يعني الأوزان مضغوطة لأربع bits عشان تنفع على الكارت ده. المستوى الـ hosted: Llama-3.3-70B عن طريق API مجاني. والمستوى التجاري: Gemini 3.1 Flash-Lite، برضه من الـ free tier. حجم Gemini الشركة مش معلناه، فسجّلناه unknown مش تقدير. نقطة شفافية مهمة: كان فيه موديل prompted تاسع، بس سقط في بوابة الـ reportability. البوابة دي قاعدة بتقول الخلية متتبلّغش غير لو كل class فيها 5 items على الأقل، والخلية فيها 40 item على الأقل، والموديل قدر يـ parse نص إجاباته على الأقل. توقعات الموديل ده لسه موجودة في الـ raw store، لكن مش بتدخل أي جدول. إحنا مبنحذفش نتايج، إحنا بنستبعد بقاعدة معلنة قبل ما نشوف الأرقام. لو سألوك: ليه 4-bit مش full precision؟ لأن الهدف إن الموديلات المحلية تشتغل على كارت مجاني واحد. وإحنا مسجّلين في التهديدات إن الـ 4-bit ممكن يقلّل دقتها شوية عن الـ full precision.",
+   "sources": [
+    "main.tex:334-347",
+    "main.tex:349-375",
+    "main.tex:433-436",
+    "main.tex:704-705"
+   ]
+  },
+  {
+   "id": "encoder-setup",
+   "layout": "bullets",
+   "title": "Encoder arm: fine-tuning setup",
+   "bullets": [
+    "bert-base-uncased and roberta-base with a classification head",
+    "AdamW, learning rate 2×10⁻⁵, batch 16, max length 128, linear decay without warmup, full precision",
+    "3 epochs on the binary tasks, 10 on the sub-types",
+    "'w' = inverse-frequency (balanced) class weighting in the loss; 'u' = unweighted control on the security task",
+    "Re-fitted per regime on that regime's training folds; one seed per configuration (see threats)"
+   ],
+   "stats": [
+    {
+     "value": "0.11 B / 0.13 B",
+     "label": "parameters, BERT / RoBERTa"
+    },
+    {
+     "value": "≈277 GPU-seconds",
+     "label": "fine-tuning time, all folds of a family"
+    },
+    {
+     "value": "$0.0093",
+     "label": "median one-off fine-tuning cost per deployable model"
+    }
+   ],
+   "takeaway": "One-off fine-tuning is negligible: a 110 M-parameter encoder costs under a cent to train.",
+   "notes_ar": "دي إعدادات الـ fine-tuning بتاعة الـ encoders، عشان الـ baseline يتحكم عليه إنه عادل وقابل للتكرار. بنستخدم bert-base-uncased وroberta-base مع classification head فوقهم. الـ optimiser هو AdamW بـ learning rate 2 في 10 أس سالب 5، batch size 16، وأقصى طول 128 token، linear decay من غير warmup، وبدقة كاملة، يعني مفيش quantisation في الـ encoders. 3 epochs على الـ binary tasks و10 على الـ sub-types لأنها أصعب وفيها كلاسات أكتر. النسخة w معناها class weighting بالـ inverse frequency، يعني الـ class النادر بياخد وزن أكبر في الـ loss عشان الموديل ميتجاهلوش. والنسخة u هي control من غير وزن، عملناها على task الأمن بالذات عشان نعرف هل الوزن هو سبب أي فرق ولا لأ. الـ encoder بيتعمله fine-tune تاني في كل regime على الـ training folds بتاعة الـ regime ده، فهو دايماً بيشوف بس اللي مسموح له يشوفه. وكل configuration اتدرّبت بـ seed واحد، وأنا مسجّلة النقطة دي من دلوقتي وهرجع لها في التهديدات. الأرقام على اليمين: 0.11 و0.13 مليار parameter، والتدريب كله لعيلة splits واحدة حوالي 277 ثانية GPU، بتكلفة median حوالي 0.0093 دولار، يعني أقل من سنت. ده مهم لسؤال التكلفة بعدين: تدريب الـ encoder مش عائق. لو سألوك: seed واحد بس؟ أيوه، وعشان كده إحنا بنقول في الورقة إن الفروق الصغيرة بين encoder وencoder متتقراش أكتر من حجمها. لكن النتيجة الأساسية مش فرق صغير بين encoderين، دي سقطة كبيرة لنفس الـ encoder لما يتنقل بين كوربسين، ومتأكدة بـ McNemar paired على نفس الـ items.",
+   "sources": [
+    "main.tex:335-341",
+    "main.tex:361-362",
+    "main.tex:636-638",
+    "main.tex:704-706",
+    "cost_stats.json"
+   ]
+  },
+  {
+   "id": "prompt",
+   "layout": "figure",
+   "title": "Prompted arm: the base instruction, verbatim",
+   "figure": "prompt",
+   "bullets": [
+    "Fixed instruction: names the task, enumerates the labels, demands exactly one word — sent as one user message",
+    "Greedy decoding — temperature 0, at most twelve new tokens; the only stochastic element is item sampling",
+    "Few-shot: deterministic, class-balanced exemplars — k ∈ {2, 4, 8} total on binary, k ∈ {1, 2} per class on sub-types",
+    "Exemplars carved out before the evaluation frames are formed — an exemplar is never also a test item",
+    "Sub-studies vary one factor: phrasing (base / terse / verbose) or the few-shot ladder; hosted and commercial run zero-shot only"
+   ],
+   "takeaway": "The answer contract — exactly one word — is identical across all three phrasings and is what the strict parser enforces.",
+   "notes_ar": "ده الـ prompt الأساسي بالحرف لتاسك الـ FR/NFR، زي ما هو في الورقة. تعليمة ثابتة بتقول للموديل إنه بيصنّف requirement، بتسمّي التاسك، بتعدّد الـ labels، وبتطلب كلمة واحدة بالظبط في الرد. وبنبعتها كرسالة user واحدة. الـ decoding عندنا greedy، يعني temperature صفر و12 توكن جديدة كحد أقصى. ده معناه إن الموديل مفيهوش أي عشوائية في الإجابة نفسها؛ العشوائية الوحيدة في الـ arm ده هي اختيار العينة اللي بنقيّم عليها. في حالة الـ few-shot، بنحط أمثلة deterministic ومتوازنة بين الـ classes: k بيساوي 2 أو 4 أو 8 في المجموع على التاسكات الـ binary، و1 أو 2 لكل class على الـ sub-types. والنقطة المهمة جداً هنا: الأمثلة دي بتتقطع من الكوربس قبل ما نكوّن frames التقييم، فمستحيل مثال يبقى هو نفسه test item، يعني مفيش leakage. عندنا دراستين فرعيتين، كل واحدة بتغيّر عامل واحد بس: الصياغة (base وterse وverbose) وسلّم الـ few-shot. الموديل الـ hosted والتجاري شغّالين zero-shot بس بسبب الـ rate limits بتاعة المزوّد. اللي عايزة أأكد عليه: عقد الإجابة — كلمة واحدة بالظبط — هو هو في الصياغات التلاتة، وده اللي الـ parser الصارم بيطبّقه، وهنشوفه في السلايد الجاية. لو سألوك: ليه مش chain-of-thought؟ لأن الهدف قياس التصنيف نفسه بشكل deterministic ورخيص، والـ 12 توكن كفاية لكلمة واحدة، وأي reasoning طويل هيغيّر التكلفة وهيكسر المقارنة العادلة مع الـ encoders.",
+   "sources": [
+    "main.tex:377-388",
+    "main.tex:390-414"
+   ]
+  },
+  {
+   "id": "parsing",
+   "layout": "flow",
+   "title": "Strict parsing: an unusable answer is not a free pass",
+   "flow": [
+    {
+     "step": "1. Reply generated",
+     "detail": "Greedy, ≤ 12 new tokens, one-word contract"
+    },
+    {
+     "step": "2. Leading label",
+     "detail": "The reply begins with a label (word-boundary aware) → that label wins"
+    },
+    {
+     "step": "3. Single mention",
+     "detail": "Otherwise exactly one label named anywhere in the reply → that label wins"
+    },
+    {
+     "step": "4. Both or neither",
+     "detail": "Reply names both labels or none → unparseable, scored as WRONG"
+    },
+    {
+     "step": "5. Repair pass",
+     "detail": "Same rule at generation time and in an idempotent pass over archived raw outputs → stored and scored never diverge silently"
+    }
+   ],
+   "takeaway": "Harsher than lenient prior protocols, matching deployment — yet the parser accepted 99.98% of the phrasing sub-study's 11,518 responses.",
+   "notes_ar": "بعد ما الموديل بيرد، إزاي بنحوّل الرد لـ label؟ عندنا قاعدة parsing صارمة وواعية بحدود الكلمات، يعني بتدوّر على الكلمة كاملة مش على جزء منها. الخطوات بسيطة: لو الرد بيبدأ بـ label، الـ label ده يكسب. لو لأ، لو فيه label واحد بالظبط متذكر في أي مكان في الرد، يكسب. غير كده — يعني الرد بيذكر الاتنين مع بعض أو ولا واحد فيهم — الإجابة بتتحسب unparseable وبتتسجّل غلط. القاعدة دي أقسى من البروتوكولات اللينة الشائعة في الأدبيات، اللي ساعات بتسيب الإجابة الغامضة أو بتعيد المحاولة. إحنا اخترنا الصرامة عن قصد لأنها بتطابق الـ deployment: في النظام الحقيقي، الإجابة اللي متنفعش مش free pass، هي غلط. وعشان نضمن الاتساق، نفس القاعدة بتتطبق مرتين: وقت التوليد، وتاني في repair pass idempotent على الـ raw outputs المؤرشفة. idempotent يعني لو شغّلتها مية مرة هتدي نفس النتيجة. كده اللي متخزّن واللي بيتحسب عليه الـ score مستحيل يختلفوا في صمت، وده جزء من إن الشغل reproducible. لو سألوك: هل الـ parser الصارم هو اللي بيعمل الفرق بين الموديلات؟ لأ. في دراسة الصياغة الـ parser قبل 99.98% من 11,518 رد، يعني الردود كانت well-formed، والأخطاء اللي هنشوفها أخطاء تصنيف حقيقية مش مشكلة format.",
+   "sources": [
+    "main.tex:416-422",
+    "main.tex:606-608"
+   ]
+  },
+  {
+   "id": "metrics-gate",
+   "layout": "stats",
+   "title": "Metrics, uncertainty, and the reportability gate",
+   "stats": [
+    {
+     "value": "76,115",
+     "label": "predictions scored under one rule"
+    },
+    {
+     "value": "81 of 87",
+     "label": "cells pass the reportability gate (6 excluded, not imputed)"
+    },
+    {
+     "value": "2,000",
+     "label": "stratified bootstrap resamples, seed 42"
+    }
+   ],
+   "bullets": [
+    "Primary metric macro-F1 over the declared label set; weighted F1 and accuracy alongside; baselines through the same scorer",
+    "Bootstrap resamples drawn within each true class — no resample can lose a rare class",
+    "Gate per cell (model × task × dataset × regime): every class ≥ 5 items, cell ≥ 40 items, ≥ 50% parsed",
+    "Store: 24,280 encoder + 35,049 prompted binary + 16,786 prompted sub-type predictions"
+   ],
+   "takeaway": "Failing cells are excluded, never imputed — no reported number rests on a cell the model could not actually answer.",
+   "notes_ar": "هنا بشرح إزاي بنقيس وإمتى بنعتبر النتيجة صالحة للتقرير. المقياس الأساسي هو macro-F1 على الـ label set المعلنة. macro-F1 يعني بناخد الـ F1 لكل class وبنعمل متوسط بالتساوي، فالـ class الصغير بيتحسب زي الكبير، وده مهم جداً في تاسك زي security اللي فيه الـ class النادر هو المهم. وبنبلّغ weighted F1 والـ accuracy جنبه. عدم اليقين بنحسبه بـ stratified bootstrap: 2,000 resample بـ seed 42، وبنسحب جوه كل class حقيقي لوحده، فمفيش resample ممكن يفقد class نادر. بعدين عندنا بوابة reportability لكل خلية، والخلية هي موديل في تاسك في dataset في regime. الخلية بتتبلّغ بس لو كل class فيه 5 عناصر على الأقل، والخلية فيها 40 عنصر على الأقل، والموديل عرف يـ parse 50% على الأقل من ردوده. 6 خلايا من 87 سقطت في البوابة، واتستبعدت مش اتعوّضت بأرقام مقدّرة. الـ baselines، majority-class وstratified-random، بتعدي من نفس الـ scorer. المخزن كله 76,115 توقع: 24,280 encoder، و35,049 prompted binary، و16,786 prompted sub-type. القوة هنا إن كل رقم في الورقة جاي من prediction متخزّن ومتحسب بنفس القاعدة، وده اللي بيخلي الشغل reproducible وقابل للمراجعة. لو سألوك: ليه استبعاد بدل imputation؟ لأن الـ imputation هيديني رقم لخلية الموديل مقدرش يجاوب عليها أصلاً، وده هيجمّل النتيجة لصالح الموديل الأضعف.",
+   "sources": [
+    "main.tex:424-438"
+   ]
+  },
+  {
+   "id": "significance",
+   "layout": "stats",
+   "title": "Paired significance: 260 exact McNemar tests, one family",
+   "stats": [
+    {
+     "value": "260",
+     "label": "exact two-sided McNemar tests (encoder–LLM pairs)"
+    },
+    {
+     "value": "175 / 170 / 131",
+     "label": "significant raw / after Benjamini–Hochberg / after Holm"
+    },
+    {
+     "value": "106 + 90 + 64",
+     "label": "in-domain + cross-project + cross-dataset = 260"
+    }
+   ],
+   "bullets": [
+    "One test = one encoder–LLM pair on all items they share, aligned by requirement identifier, over paired disagreements",
+    "Not one test per item — one test per encoder–LLM pair within a cell",
+    "All 260 corrected as one family, Holm and Benjamini–Hochberg at α = 0.05; verdicts keyed on BH-adjusted p",
+    "Wins / ties / losses always stated from the encoder's side"
+   ],
+   "takeaway": "Every ranking claim rests on exact, paired, family-corrected tests — not on point-estimate ordering.",
+   "notes_ar": "دلوقتي الجزء الإحصائي، وعايزة أوضّحه كويس قبل ما نشوف أي نتيجة. كل مقارنة بين encoder وLLM بتتعمل بـ exact two-sided McNemar test. McNemar ببساطة بيقارن موديلين على نفس العناصر بالظبط، وبيبص بس على العناصر اللي اختلفوا فيها: مين صح ومين غلط فين. exact يعني بنحسب الاحتمال بالظبط مش بتقريب، وده أنسب للأعداد الصغيرة. النقطة اللي لازم تبقى واضحة: الاختبار الواحد هو زوج encoder–LLM واحد على كل العناصر المشتركة بينهم، مرتبين بالـ requirement id مش بالمكان. يعني مش اختبار لكل عنصر، ده اختبار لكل زوج جوه الخلية. عندنا 260 اختبار كده. وبما إننا عاملين تجارب كتير، لازم تصحيح عشان مفيش نتيجة تطلع significant بالصدفة. فصحّحنا الـ 260 كلهم كعيلة واحدة، مش كل regime لوحده، بطريقتين: Holm وBenjamini–Hochberg عند alpha 0.05. النتيجة: 175 significant خام، 170 بعد BH، و131 بعد Holm، والأحكام في الورقة مبنية على الـ p المعدّل بـ BH. الـ 260 بيتقسموا بالـ regime: 106 in-domain، 90 cross-project، و64 cross-dataset. وكل win أو tie أو loss بنقولها دايماً من ناحية الـ encoder، فلما أقول خسارة يعني الـ encoder خسر. القوة هنا إن أي ترتيب بنقوله مش من مقارنة أرقام point estimate، ده من اختبار paired على نفس الـ items ومصحّح للعيلة كلها. لو سألوك: ليه Holm وBH الاتنين؟ Holm بيتحكم في احتمال أي خطأ واحد، وBH في نسبة الاكتشافات الغلط، فبنعرض الأشد والأقل تحفظاً؛ الأحكام على BH لكن الاتنين مبلّغين.",
+   "sources": [
+    "main.tex:322-332",
+    "main.tex:428-432",
+    "main.tex:483-485",
+    "main.tex:516-519",
+    "main.tex:526-529"
+   ]
+  },
+  {
+   "id": "cost-model",
+   "layout": "bullets",
+   "title": "Cost model: what a classification costs and when training pays back",
+   "bullets": [
+    "Every prediction row records tokens, wall-clock latency and, for encoders, training time — prices frozen at generation",
+    "Local compute priced as imputed rental of the benchmark GPU: AWS g4dn.xlarge, one NVIDIA T4, $0.5260/h",
+    "API list rates per million input/output tokens: Gemini 3.1 Flash-Lite $0.25/$1.50; Llama-3.3-70B $0.59/$0.79",
+    "Encoder cost separates one-off fine-tuning C₀ from marginal per-item cost c_enc",
+    "Free-tier latency dominated by provider queueing → projections use per-request median; queue-inflated mean reported separately"
+   ],
+   "stats": [
+    {
+     "value": "N* = C₀ / (c_alt − c_enc)",
+     "label": "break-even: classifications after which fine-tuning is repaid"
+    },
+    {
+     "value": "$0.5260 / h",
+     "label": "imputed T4 rental (AWS g4dn.xlarge, on demand)"
+    }
+   ],
+   "takeaway": "N* is a pure cost crossover — how many classifications repay training, regardless of the accuracy gap.",
+   "notes_ar": "قبل ما ندخل على RQ3، عايزة أشرح إزاي بنحسب التكلفة عشان حضراتكم تقدروا تحكموا على الافتراضات. كل صف prediction في المخزن بيسجّل عدد التوكنز، والـ latency الفعلية بالساعة، وللـ encoders وقت التدريب كمان. والأسعار بتتجمّد جوه الصف وقت التوليد، فلو الأسعار اتغيّرت بعدين الأرقام بتاعتنا مش بتتغيّر. الحوسبة المحلية بنسعّرها كإيجار مفترض للـ GPU اللي شغّلنا عليه: AWS g4dn.xlarge بكارت T4 واحد، بـ 0.5260 دولار في الساعة on demand. ده معناه إننا مش بنقول المحلي ببلاش، إحنا بنحسب تمنه بشكل عادل. موديلات الـ API بأسعار القوائم الرسمية للمليون توكن: Gemini 3.1 Flash-Lite بـ 0.25 دولار input و1.50 output، وLlama-3.3-70B بـ 0.59 و0.79. تكلفة الـ encoder بنفصلها لجزئين: تكلفة الـ fine-tuning مرة واحدة C0، والتكلفة الحدّية لكل عنصر c_enc. ومن هنا بتطلع معادلة الـ break-even: N* تساوي C0 على الفرق بين تكلفة البديل لكل عنصر وتكلفة الـ encoder لكل عنصر. يعني بعد كام تصنيف التدريب يبقى طلّع تمنه. ده crossover تكلفة بس، مالوش علاقة بفرق الدقة. آخر نقطة: الـ latency على الـ free tier بيتحكم فيها طابور المزوّد مش الموديل، فالإسقاطات بتستخدم الـ median لكل request، والـ mean المتضخّم من الطابور بنبلّغه لوحده. لو سألوك: ليه سعر إيجار مش الكهرباء الفعلية؟ لأن الإيجار السحابي رقم عام وقابل للتحقق وبيحط المحلي والـ API على نفس المقياس؛ وأي سعر تاني بيغيّر المقدار مش الترتيب.",
+   "sources": [
+    "main.tex:440-456"
+   ]
+  },
+  {
+   "id": "sec-results",
+   "layout": "section",
+   "title": "Part II — Results: RQ1 and RQ2",
+   "subtitle": "First reproduce the convention — then move the training distribution and watch the ranking",
+   "notes_ar": "خلصنا جزء التصميم، وندخل دلوقتي على النتائج. الجزء ده بيجاوب على سؤالين: RQ1 وRQ2. الأول هنعيد الـ convention بتاعت المجال زي ما هي: in-domain، يعني التدريب والاختبار من نفس الـ corpus، بـ stratified 5-fold cross-validation. وده مقصود، عشان نتأكد إن الـ setup بتاعنا بيطلّع نفس الصورة اللي الأدبيات بتقولها قبل ما نغيّر أي حاجة. وبعدين نحرّك توزيع التدريب خطوة خطوة: الأول مشاريع كاملة مش متشافة، وده الـ cross-project، وبعدين corpus تاني خالص، وده الـ cross-dataset. وفي كل محطة نشوف الترتيب بين الـ encoders والـ prompted LLMs بيعمل إيه. المهم إن طول الوقت نفس الـ items، نفس الـ scorer، ونفس الـ 12 configuration. الحاجة الوحيدة اللي بتتغير هي مسافة الـ shift بين اللي الموديل اتدرب عليه واللي بيتقيّم عليه. الـ prompted models مش بتتدرب على حاجة، فنتيجتها ثابتة عبر الـ regimes وبتشتغل كخط مرجعي، والـ encoders بتتدرب من جديد في كل محطة. هناخد تلات slides للـ RQ1، وبعدين ندخل على الـ RQ2 اللي فيها القلب.",
+   "sources": [
+    "main.tex:459-463",
+    "main.tex:312-332"
+   ]
+  },
+  {
+   "id": "rq1-table",
+   "layout": "table",
+   "title": "RQ1 — In-domain macro-F1, all twelve configurations",
+   "table": {
+    "headers": [
+     "Configuration",
+     "FR/NFR PROMISE_exp",
+     "Security PROMISE_exp",
+     "Security SecReq",
+     "Sub-types top-4",
+     "Sub-types top-6",
+     "Sub-types all-11"
+    ],
+    "rows": [
+     [
+      "BERT_w",
+      "0.908",
+      "0.923",
+      "0.836",
+      "0.878",
+      "0.827",
+      "0.657"
+     ],
+     [
+      "BERT_u",
+      "—",
+      "0.907",
+      "—",
+      "—",
+      "—",
+      "—"
+     ],
+     [
+      "RoBERTa_w",
+      "0.896",
+      "0.902",
+      "0.824",
+      "0.936",
+      "0.837",
+      "0.724"
+     ],
+     [
+      "RoBERTa_u",
+      "—",
+      "0.903",
+      "—",
+      "—",
+      "—",
+      "—"
+     ],
+     [
+      "Gemini 3.1 Flash-Lite",
+      "0.867",
+      "0.829",
+      "0.713",
+      "0.922",
+      "—",
+      "—"
+     ],
+     [
+      "Llama-3.3-70B",
+      "0.852",
+      "0.891",
+      "0.814",
+      "0.907",
+      "0.782",
+      "—"
+     ],
+     [
+      "Qwen2.5-7B",
+      "0.656",
+      "0.884",
+      "0.846",
+      "0.876",
+      "0.824",
+      "0.576"
+     ],
+     [
+      "Llama-3.1-8B",
+      "0.682",
+      "0.872",
+      "0.845",
+      "0.700",
+      "0.717",
+      "0.629"
+     ],
+     [
+      "Gemma-2-2B",
+      "0.663",
+      "0.900",
+      "0.821",
+      "0.760",
+      "0.603",
+      "0.527"
+     ],
+     [
+      "Phi-4-mini",
+      "0.727",
+      "0.798",
+      "0.635",
+      "0.727",
+      "0.712",
+      "0.599"
+     ],
+     [
+      "SmolLM3-3B",
+      "0.562",
+      "0.841",
+      "0.717",
+      "0.763",
+      "0.693",
+      "0.482"
+     ],
+     [
+      "Qwen2.5-3B",
+      "0.554",
+      "0.707",
+      "0.741",
+      "0.732",
+      "0.689",
+      "0.543"
+     ]
+    ]
+   },
+   "bullets": [
+    "Majority-class baseline 0.351 / 0.466 / 0.376 / 0.131 / 0.075 / 0.035 — every reportable model clears it; '—' = below gate or not run",
+    "Encoder cells: 5-fold CV over all items (n = 968, 968, 444, 353, 433, 524); prompted cells: stratified samples of the same items (n = 59–960)"
+   ],
+   "takeaway": "Encoders post the best score in 5 of 6 columns; the one prompted lead (Qwen2.5-7B 0.846 vs 0.836, SecReq) never reaches significance: McNemar p = 0.696, BH 0.774.",
+   "notes_ar": "ده الجدول الكامل للـ in-domain macro-F1 لكل الـ 12 configuration على 6 خلايا: FR/NFR على PROMISE_exp، الأمن على PROMISE_exp وعلى SecReq، والـ NFR sub-types بتلات أحجام: top-4 وtop-6 وall-11. macro-F1 يعني متوسط الـ F1 لكل class بالتساوي، فالـ class الصغير بيتحسب زي الكبير، وده مهم في داتا غير متوازنة زي بتاعتنا. الـ encoders الأحسن في 5 من 6 أعمدة: BERT_w بـ 0.908 على FR/NFR و0.923 على أمن PROMISE_exp، وRoBERTa_w بـ 0.936 و0.837 و0.724 على top-4 وtop-6 وall-11. الاستثناء الوحيد أمن SecReq: Qwen2.5-7B بـ 0.846 مقابل BERT_w بـ 0.836، وده فرق عمره ما وصل لـ significance: exact McNemar p = 0.696، وبعد تصحيح BH بقى 0.774. McNemar بيقارن الموديلين على نفس العناصر بالظبط ويشوف مين غلط فين، وBH تصحيح عشان إحنا عاملين اختبارات كتير ومش عايزين نتيجة تطلع significant بالصدفة. كل موديل reportable فوق الـ majority-class baseline، يعني موديل بيقول أكتر class طول الوقت. والشرطة معناها الخلية تحت الـ reportability gate أو ماتعملتش. نقطة design مهمة: خلايا الـ encoder بـ 5-fold cross-validation على كل العناصر، والـ prompted على عينات stratified من نفس العناصر بالظبط، فكل مقارنة جاية بعد كده paired item-for-item. لو سألوك: ليه الـ prompted على عينات مش كل الداتا؟ عشان حدود الـ free tier: 300 عنصر لكل binary cell و200 لكل sub-type cell، موزعين بنسبة الـ class prior بحد أدنى 10 لكل class، والموديلات المحلية الستة جاوبت كمان على الـ frames الكاملة. والـ McNemar بيتعمل بس على العناصر المشتركة، فالمقارنة عادلة.",
+   "sources": [
+    "tab_in_domain.tex:9-24",
+    "main.tex:463-471",
+    "main.tex:481",
+    "main.tex:487-492",
+    "main.tex:326-332",
+    "main.tex:428-432"
+   ]
+  },
+  {
+   "id": "rq1-chart",
+   "layout": "chart",
+   "title": "RQ1 qualified — scale does not order the results",
+   "chart": {
+    "type": "bar",
+    "categories": [
+     "BERT_w",
+     "RoBERTa_w",
+     "Gemini 3.1 Flash-Lite",
+     "Llama-3.3-70B",
+     "Qwen2.5-7B",
+     "Llama-3.1-8B",
+     "Gemma-2-2B",
+     "Phi-4-mini",
+     "SmolLM3-3B",
+     "Qwen2.5-3B"
+    ],
+    "series": [
+     {
+      "name": "FR/NFR",
+      "values": [
+       0.908,
+       0.896,
+       0.867,
+       0.852,
+       0.656,
+       0.682,
+       0.663,
+       0.727,
+       0.562,
+       0.554
+      ]
+     },
+     {
+      "name": "Security",
+      "values": [
+       0.923,
+       0.902,
+       0.829,
+       0.891,
+       0.884,
+       0.872,
+       0.9,
+       0.798,
+       0.841,
+       0.707
+      ]
+     }
+    ],
+    "y_label": "macro-F1 (in-domain, PROMISE_exp)",
+    "y_min": 0,
+    "y_max": 1
+   },
+   "bullets": [
+    "The 2.6 B Gemma-2-2B beats the hosted 70 B model on PROMISE_exp security (0.900 vs 0.891)",
+    "Small open models collapse on FR/NFR (0.554–0.727) while remaining competitive on security",
+    "Encoder advantage widens with the label set: +0.014 top-4, +0.013 top-6, +0.095 all-11 — supervision buys the long tail",
+    "Coverage check: top-4 recomputed on the 59 items every model answered — best encoder still leads +0.036 (0.966 vs 0.930)"
+   ],
+   "takeaway": "The ordering is neither an artefact of coverage nor a function of parameter count — and the FR/NFR 'collapse' will turn out to be a prior problem (Part III).",
+   "notes_ar": "الرسمة دي بتحط عمودين لكل موديل على PROMISE_exp: FR/NFR والأمن، الاتنين in-domain. تلات ملاحظات بتقيّد الترتيب. أولاً الحجم مش بيرتّب النتائج: Gemma-2-2B بـ 2.6 مليار parameter غلبت Llama-3.3-70B المستضاف على أمن PROMISE_exp بـ 0.900 مقابل 0.891. ثانياً الموديلات المفتوحة الصغيرة انهارت على FR/NFR، من 0.554 لـ 0.727، بس فضلت منافسة على الأمن؛ بصوا على الفرق بين العمودين عند Qwen2.5-7B وGemma. ثالثاً ميزة الـ encoder بتتوسّع مع حجم الـ label set: +0.014 على top-4، +0.013 على top-6، لكن +0.095 على all-11. ده متوقع لو الـ supervision بتشتري الذيل الطويل، يعني الـ classes النادرة اللي الـ prompt لوحده مش بيعرفها. وعشان أحجام الخلايا مختلفة من 59 لـ 968، أعدنا حساب ترتيب top-4 على الـ 59 عنصر اللي كل الموديلات جاوبت عليهم: أحسن encoder لسه متقدم بـ +0.036، 0.966 مقابل 0.930. يعني الترتيب مش artefact للتغطية ولا دالة في عدد الـ parameters. والانهيار على FR/NFR ده هنرجع له في الجزء التالت، وهيطلع مشكلة prior، يعني نسبة الـ class اللي الموديل بيفترضها، مش مشكلة فهم للنص. لو سألوك: ليه الأمن أسهل للموديلات الصغيرة من FR/NFR؟ الأمن ليه مفردات مميزة، لكن FR/NFR محتاج الموديل يظبط حد القرار على نسبة الـ NFR في الداتا، وده اللي الموديلات الصغيرة بتغلط فيه زي ما هنشوف في الجزء التالت.",
+   "sources": [
+    "tab_in_domain.tex:9-22",
+    "main.tex:473-481"
+   ]
+  },
+  {
+   "id": "rq1-verdict",
+   "layout": "stats",
+   "title": "RQ1 verdict — in-domain, encoders win 67 of 106 and lose none",
+   "stats": [
+    {
+     "value": "106",
+     "label": "in-domain paired McNemar tests"
+    },
+    {
+     "value": "67",
+     "label": "encoder wins (BH-significant)"
+    },
+    {
+     "value": "39",
+     "label": "ties (inconclusive)"
+    },
+    {
+     "value": "0",
+     "label": "encoder losses"
+    }
+   ],
+   "bullets": [
+    "Verdicts keyed on the BH-adjusted p within the single 260-test family (Holm and BH, alpha = 0.05)",
+    "In-domain the encoders are never significantly beaten",
+    "Caveat: commercial arm at n ≈ 60 per cell, 23 of its 26 comparisons inconclusive — partly limited power"
+   ],
+   "takeaway": "RQ1 — under the field's own convention, supervision still wins.",
+   "notes_ar": "الاختبارات المزدوجة بتخلي الحكم دقيق مش مجرد انطباع من الجدول. paired يعني الموديلين بيتقيّموا على نفس الـ items بالظبط، متظبطين بالـ requirement id مش بالترتيب. من الـ 260 اختبار McNemar في الورقة، 106 منهم in-domain. النتيجة: الـ encoders كسبت 67، تعادلت 39، وخسرت صفر. الحكم بيتحدد على الـ BH-adjusted p جوه عيلة واحدة من 260 اختبار، وإحنا طبّقنا Holm وBH الاتنين عند alpha 0.05. التصحيح ده معناه إن إحنا عاملين اختبارات كتير ومش عايزين نتيجة تطلع significant بالصدفة، وده بيخلي كل win في الرقم ده win محافظ. يعني in-domain الـ encoders عمرها ما اتغلبت بشكل significant. لازم أقول التحفظ بصراحة: الذراع التجاري Gemini جري على n حوالي 60 للخلية، و23 من 26 مقارنة بتاعته طلعت inconclusive، فجزء من 'عمره ما اتغلب' راجع لقوة إحصائية محدودة مش لتفوق أكيد. إحنا كاتبين ده في الـ threats to validity. بس الخلاصة في النظام ده واضحة: تحت الـ convention بتاعت المجال نفسه، الـ supervision لسه بتكسب. ودي نقطة البداية اللي هنقلبها في الـ slides الجاية. لو سألوك: ليه صفر خسارة بس 39 تعادل؟ التعادل معناه الفرق مش significant بعد التصحيح، وأغلبها في الخلايا الصغيرة؛ مش معناه إن الـ LLM أحسن، معناه إن الداتا مش كفاية تحسم.",
+   "sources": [
+    "main.tex:483-485",
+    "main.tex:135-136",
+    "main.tex:428-432",
+    "main.tex:700-702"
+   ]
+  },
+  {
+   "id": "cross-project",
+   "layout": "table",
+   "title": "RQ2 (a) — Cross-project transfer is survivable",
+   "table": {
+    "headers": [
+     "Task — corpus",
+     "Configuration",
+     "In-domain macro-F1",
+     "Cross-project macro-F1",
+     "Δ %"
+    ],
+    "rows": [
+     [
+      "Security — PROMISE_exp",
+      "BERT_w",
+      "0.923",
+      "0.865",
+      "−6"
+     ],
+     [
+      "Security — PROMISE_exp",
+      "RoBERTa_w",
+      "0.902",
+      "0.876",
+      "−3"
+     ],
+     [
+      "Security — SecReq",
+      "BERT_w",
+      "0.836",
+      "0.588",
+      "−30"
+     ],
+     [
+      "Security — SecReq",
+      "RoBERTa_w",
+      "0.824",
+      "0.668",
+      "−19"
+     ],
+     [
+      "FR/NFR — PROMISE_exp",
+      "BERT_w",
+      "0.908",
+      "0.843",
+      "−7"
+     ],
+     [
+      "FR/NFR — PROMISE_exp",
+      "RoBERTa_w",
+      "0.896",
+      "0.853",
+      "−5"
+     ],
+     [
+      "Sub-types top-4",
+      "BERT_w",
+      "0.878",
+      "0.800",
+      "−9"
+     ],
+     [
+      "Sub-types top-4",
+      "RoBERTa_w",
+      "0.936",
+      "0.835",
+      "−11"
+     ],
+     [
+      "Sub-types top-6",
+      "BERT_w",
+      "0.827",
+      "0.735",
+      "−11"
+     ],
+     [
+      "Sub-types top-6",
+      "RoBERTa_w",
+      "0.837",
+      "0.753",
+      "−10"
+     ],
+     [
+      "Sub-types all-11",
+      "BERT_w",
+      "0.657",
+      "0.579",
+      "−12"
+     ],
+     [
+      "Sub-types all-11",
+      "RoBERTa_w",
+      "0.724",
+      "0.688",
+      "−5"
+     ]
+    ]
+   },
+   "bullets": [
+    "Unseen projects cost the encoders 3–12% on PROMISE_exp and up to 30% on the much smaller SecReq",
+    "Paired verdict: encoders ahead or tied in 76 of 90 cross-project tests"
+   ],
+   "takeaway": "The degradation NoRBERT anticipated — real but moderate.",
+   "notes_ar": "أول محطة shift: cross-project. بدل ما نقسم الداتا عشوائي، بنحجز مشاريع كاملة مش متشافة: grouped folds بتحجز مجموعات مشاريع كاملة، وكمان leave-one-project-out على الـ 47 مشروع بتوع PROMISE_exp. الجدول بيقارن الـ in-domain macro-F1 بالـ cross-project لنفس الـ encoder، وΔ% هي الخسارة النسبية عن المرجع الـ in-domain. على PROMISE_exp الخسارة من 3 لـ 12%: مثلاً BERT_w على الأمن من 0.923 لـ 0.865، وعلى FR/NFR من 0.908 لـ 0.843. على SecReq الصغير جداً، وهو 3 specs بس، الخسارة أكبر: BERT_w من 0.836 لـ 0.588، يعني −30%. وده منطقي، لما تحجز spec كامل من 3 بتفقد جزء كبير من التدريب. لكن الحكم الـ paired لسه لصالح الـ encoders: متقدمة أو متعادلة في 76 من 90 اختبار cross-project، وكل اختبار منهم على نفس العناصر ومصحح جوه نفس العيلة الـ 260. ده بالظبط التدهور اللي NoRBERT توقعته: حقيقي بس معتدل. لحد هنا القصة ماشية مع الأدبيات، والـ encoders لسه survivable على مشاريع جديدة من نفس الـ corpus. الـ slide الجاية هي اللي الصورة بتتقلب فيها لما الـ corpus نفسه يتغير. لو سألوك: ليه مفيش cross-project لـ BERT_u وRoBERTa_u؟ الـ unweighted نسخة control على task الأمن بس، عشان نعزل أثر الـ class weighting، والجدول بيعرض الخلايا اللي اتقاست فعلاً.",
+   "sources": [
+    "tab_transfer.tex:9-33",
+    "main.tex:516-519",
+    "main.tex:316-317",
+    "main.tex:339-341"
+   ]
+  },
+  {
+   "id": "cross-dataset",
+   "layout": "chart",
+   "title": "RQ2 (b) — Cross-dataset transfer reverses the ranking",
+   "chart": {
+    "type": "bar",
+    "categories": [
+     "BERT_w",
+     "BERT_u",
+     "RoBERTa_w",
+     "RoBERTa_u"
+    ],
+    "series": [
+     {
+      "name": "In-domain (trained on PROMISE_exp)",
+      "values": [
+       0.923,
+       0.907,
+       0.902,
+       0.903
+      ]
+     },
+     {
+      "name": "Cross-dataset (trained on SecReq)",
+      "values": [
+       0.528,
+       0.534,
+       0.698,
+       0.707
+      ]
+     }
+    ],
+    "y_label": "macro-F1, PROMISE_exp security (same items)",
+    "y_min": 0,
+    "y_max": 1
+   },
+   "bullets": [
+    "Class-weighted BERT: 0.923 → 0.528 on the very same items once trained on SecReq — a loss of 42.8%",
+    "RoBERTa more robust: 0.902 → 0.698 (−23%); reverse direction milder: −17% (BERT_w), −16% (RoBERTa_w)",
+    "Prompted models, tuning on nothing, move only with corpus difficulty: −0.034 to +0.163",
+    "Cross-dataset applies only to security — the one task both corpora annotate"
+   ],
+   "takeaway": "Over 64 cross-dataset tests prompted models win 48, encoders 3, ties 13 — in-domain 67–39–0 becomes 3–13–48.",
+   "notes_ar": "هنا الانقلاب اللي الورقة كلها مبنية عليه. الـ cross-dataset يعني إحنا بندرّب الـ encoder على task الـ security في كوربس، ونختبره على الكوربس التاني. وده ينفع بس في الـ security، لأنها الـ task الوحيدة اللي الكوربسين بيعلّموها.\n\nبصّوا على الرسم. المجموعة الأولى من الأعمدة هي macro-F1 على PROMISE_exp security لما الموديل اتدرّب على PROMISE_exp نفسه، يعني in-domain. المجموعة التانية هي نفس الموديل، على نفس العناصر بالظبط، بس اتدرّب على SecReq. BERT_w نزل من 0.923 لـ 0.528. دي خسارة 42.8%، والجدول في الورقة بيقرّبها لـ 43. BERT_u نفس الحكاية: من 0.907 لـ 0.534. RoBERTa أقوى شوية: من 0.902 لـ 0.698، يعني ناقص 23%، و RoBERTa_u من 0.903 لـ 0.707.\n\nالاتجاه العكسي أخف: لما ندرّب على PROMISE_exp ونختبر على SecReq، BERT_w بينزل من 0.836 لـ 0.690 يعني ناقص 17%، و RoBERTa_w من 0.824 لـ 0.696 يعني ناقص 16%.\n\nالـ prompted models مش بتتدرّب على أي حاجة، فمفيش عندها training corpus يتبدّل. اللي بيتحرك فيها بس هو صعوبة الكوربس نفسه: من ناقص 0.034 لزائد 0.163.\n\nوالنتيجة في الاختبارات الـ paired: من 64 اختبار cross-dataset، الـ prompted كسبت 48، الـ encoders كسبت 3 بس، و13 تعادل. يعني in-domain كانت 67 مكسب و39 تعادل وصفر خسارة، وبقت 3 و13 و48. نفس الاتنعشر موديل، ونفس الـ scorer، ونفس العناصر، والحكم اتقلب.\n\nالنقطة المهمة: ده مش تقدير. الـ test items هي هي، متحاذية بالـ requirement id، والفرق الوحيد هو الكوربس اللي الموديل اتدرّب عليه.\n\nلو سألوك: هل دي مقارنة عادلة والـ prompted ما اتدرّبتش أصلاً؟ أيوه، ده بالظبط الفكرة: الـ prompted هي خط مرجعي ثابت لأن مفيش عندها training distribution، والـ encoder هو اللي بيتحرّك، وإحنا بنقيس قد إيه بيقع منه.",
+   "sources": [
+    "tab_transfer.tex",
+    "main.tex:521-529",
+    "main.tex:533-534",
+    "main.tex:318-320",
+    "main.tex:322-332"
+   ]
+  },
+  {
+   "id": "inversion",
+   "layout": "figure",
+   "title": "The inversion, in metric and in verdict form",
+   "figure": "fig_inversion",
+   "bullets": [
+    "(a) Security on identical PROMISE_exp items: encoders start above all eight prompted models, then fall through",
+    "(b) In-domain: 106 tests → encoders 67 wins / 39 ties / 0 losses",
+    "(b) Cross-project: 90 tests → encoders ahead or tied in 76 of 90",
+    "(b) Cross-dataset: 64 tests → encoders 3 wins / 13 ties / 48 losses",
+    "106 + 90 + 64 = 260 exact McNemar tests — one Holm/BH family, split by encoder regime"
+   ],
+   "takeaway": "RQ2 — the loss differs sharply by model class; the ranking is a property of the regime, not of the models.",
+   "notes_ar": "الشكل ده بيلخّص القصة كلها في لوحتين.\n\nاللوحة (a) هي الـ security task على نفس عناصر PROMISE_exp. النطاق الملوّن هو المدى اللي الـ 8 موديلات prompted بتغطّيه، وده ثابت، لأن الـ prompted ماعندهاش training distribution تتغيّر معاها. الخطوط بتاعت الـ encoders بتبدأ فوق النطاق ده خالص in-domain، وكل ما الـ shift يزيد بتقع من خلاله لحد ما توصل تحته في الـ cross-dataset.\n\nاللوحة (b) هي نفس الحكاية بس بلغة الاختبارات الإحصائية. فاكرين McNemar؟ هو اختبار بيقارن موديلين على نفس العناصر بالظبط، وبيبص بس على العناصر اللي واحد فيهم صح والتاني غلط. عملنا 260 اختبار: 106 in-domain، و90 cross-project، و64 cross-dataset. وكلهم اتصحّحوا كعيلة واحدة بـ Holm و Benjamini–Hochberg، يعني عشان إحنا عاملين اختبارات كتير، بنشدّد المعيار عشان ما تطلعش نتيجة significant بالصدفة.\n\nالنتيجة من وجهة نظر الـ encoder: in-domain 67 مكسب و39 تعادل وصفر خسارة. cross-project الـ encoders متقدمة أو متعادلة في 76 من 90. cross-dataset 3 مكسب و13 تعادل و48 خسارة.\n\nده جواب RQ2: الخسارة مش بس موجودة، هي بتختلف جذرياً حسب نوع الموديل. والترتيب اللي أي benchmark بيطلّعه هو خاصية للنظام اللي بيقيس فيه، مش خاصية للموديلات نفسها.\n\nوده قوة التصميم: نفس الاتنعشر موديل، ونفس الـ scorer الصارم، ونفس العناصر بالـ id، والاختبارات كلها exact ومصحّحة كعيلة واحدة. يعني الانقلاب ده مش صدفة ولا اختيار انتقائي.\n\nلو سألوك: ليه صفر خسارة in-domain رغم إن Qwen2.5-7B متقدم على SecReq security؟ لأن التقدم ده ما وصلش للـ significance: McNemar p = 0.696، وبعد BH 0.774، فده تعادل مش خسارة.",
+   "sources": [
+    "main.tex:502-511",
+    "main.tex:483-485",
+    "main.tex:516-519",
+    "main.tex:526-529",
+    "main.tex:135-140",
+    "main.tex:428-432",
+    "main.tex:469-471"
+   ]
+  },
+  {
+   "id": "per-project",
+   "layout": "stats",
+   "title": "Aggregate scores hide per-project failure",
+   "stats": [
+    {
+     "value": "37",
+     "label": "PROMISE_exp projects with comparable coverage (leave-one-project-out, FR/NFR)"
+    },
+    {
+     "value": "0.000 and 1.000",
+     "label": "every configuration has at least one project at each extreme"
+    },
+    {
+     "value": "0.917",
+     "label": "encoder median macro-F1 across projects (s.d. 0.198)"
+    },
+    {
+     "value": "0.545–0.750",
+     "label": "small open models' medians (s.d. 0.213–0.301)"
+    }
+   ],
+   "bullets": [
+    "Leave-one-project-out arm over the 47 PROMISE_exp projects; 37 have comparable coverage",
+    "Encoder and prompted alike — every configuration has a project it scores 0.000 on and one at 1.000",
+    "Only the middle of the distribution separates the two families"
+   ],
+   "takeaway": "A corpus-level average is a weak predictor of what a practitioner meets on their own project.",
+   "notes_ar": "الشريحة دي بتقول حاجة المتوسطات بتخبّيها.\n\nفي الـ leave-one-project-out، يعني بنطلّع مشروع كامل بره التدريب، ونختبر عليه، ونكرر ده لكل مشروع، على task الـ FR/NFR. الذراع دي اتعملت على الـ 47 مشروع بتوع PROMISE_exp، والمقارنة هنا على 37 مشروع منهم اللي عندها coverage قابل للمقارنة بين كل الكونفيجريشنز.\n\nلقينا إن كل كونفيجريشن، encoder أو prompted، من غير استثناء، عندها مشروع واحد على الأقل بتجيب فيه macro-F1 صفر، ومشروع تاني بتجيب فيه واحد صحيح.\n\nيعني الطرفين واحد للكل. اللي بيفرّق بين العيلتين هو النص بس. الـ median، يعني القيمة اللي في نص التوزيع، للـ encoders 0.917 بانحراف معياري 0.198. الانحراف المعياري بيقيس قد إيه الأرقام متفرقة حوالين الوسط. الموديلات المفتوحة الصغيرة الـ median بتاعها من 0.545 لـ 0.750، والانحراف من 0.213 لـ 0.301، يعني أوطى وأكتر تشتّت.\n\nالخلاصة: متوسط الكوربس ضعيف جداً كتنبؤ باللي الممارس هيلاقيه في مشروعه هو. وده هيدخل مباشرة في قاعدة القرار اللي هقولها في آخر العرض: مش كفاية تبص على رقم واحد على مستوى الكوربس.\n\nوده كمان سبب إننا قدرنا نشوف الحاجة دي أصلاً: لأن كل requirement بتكون test item مرة واحدة بالظبط جوه كل عيلة encoders، فعندنا predictions لكل مشروع مش عيّنة.\n\nلو سألوك: ليه 37 مش 47 مشروع؟ الـ LOPO اتعمل على الـ 47 مشروع كلهم، لكن المقارنة على مستوى المشروع محتاجة كل الكونفيجريشنز تكون غطّت المشروع بشكل قابل للمقارنة، وده اتحقق في 37 مشروع.",
+   "sources": [
+    "main.tex:541-547",
+    "main.tex:316-317",
+    "main.tex:326-327"
+   ]
+  },
+  {
+   "id": "sec-mechanism",
+   "layout": "section",
+   "title": "Part III — Mechanism: one failure mode, three sources",
+   "subtitle": "A drop alone does not say why a model fails — unfamiliar vocabulary and shifted class priors imply different fixes",
+   "notes_ar": "خلصنا الجزء التاني: عرفنا قد إيه بيتخسر. الجزء التالت بيسأل: ليه؟\n\nالانخفاض لوحده مش بيقول ليه الموديل فشل. فيه تفسيرين محتملين. الأول: الموديل شاف مفردات غريبة عليه في الكوربس الجديد ومش فاهم النص. التاني: الموديل شايل معاه class prior غلط، والـ prior يعني نسبة كل class في الداتا، والـ prior ده مش مناسب للكوربس الجديد.\n\nالفرق مهم لأن كل تفسير ليه علاج مختلف: المفردات محتاجة داتا معلّمة من الكوربس الجديد، أما الـ prior فممكن يتصلّح من غير أي labels خالص.\n\nاللي هوريه في الجزء ده بالدليل: الآلية هي prior مش معاير، والعيب ده موجود في العيلتين، وله تلات مصادر: كوربس التدريب بالنسبة للـ encoder، والـ pre-training وصياغة السؤال بالنسبة للـ prompted. يعني ده مش عيب في موديل معيّن، ده عيب بيجي من طبيعة الـ task نفسها، لأن الـ task محتاجة prior مش ممكن يتقري من نص الـ requirement لوحده.",
+   "sources": [
+    "main.tex:549-552",
+    "main.tex:583-587",
+    "main.tex:624-629"
+   ]
+  },
+  {
+   "id": "prior-shift",
+   "layout": "figure",
+   "title": "The mechanism is base-rate shift, not unfamiliar vocabulary",
+   "figure": "fig_prior_shift",
+   "bullets": [
+    "(a) Transferred BERT labels 44.2% of PROMISE_exp items security — true prevalence 12.9%, training-corpus prior 39.9%",
+    "(b) Security-class precision collapses 0.847 → 0.210",
+    "(b) Recall falls far less, 0.888 → 0.720 — it still finds them; it cannot stop finding them",
+    "(c) Prompted models: same defect, other source — FR/NFR accuracy ranks with prior miscalibration (ρ = 0.95)"
+   ],
+   "takeaway": "That is the signature of prior shift, not of a model that has failed to understand the text.",
+   "notes_ar": "دي الشريحة اللي بتفصل بين التفسيرين بالدليل، مش بالتخمين.\n\nالأول، تعريف: الـ prior أو الـ base rate هو نسبة الـ class في الداتا. في PROMISE_exp الـ security 12.9% من العناصر، وفي SecReq 39.9%.\n\nاللوحة (a): BERT اللي اتدرّب على SecReq واتنقل على PROMISE_exp بيقول security على 44.2% من العناصر. النسبة الحقيقية 12.9%. لكن 44.2 دي قريبة جداً من 39.9%، الـ prior بتاع الكوربس اللي اتدرّب عليه. يعني الموديل شال معاه توقّع الكوربس القديم وطبّقه على الجديد.\n\nاللوحة (b) بتوري النتيجة على مستوى الـ class. الـ precision، يعني من كل اللي الموديل قال عليهم security، كام واحد فعلاً security، انهارت من 0.847 لـ 0.210. لكن الـ recall، يعني من الـ security الحقيقيين، الموديل لقى كام واحد، نزل بس من 0.888 لـ 0.720.\n\nوده هو الدليل الحاسم. لو المشكلة كانت مفردات غريبة، الموديل كان هيفوّت متطلبات الأمن، والـ recall هو اللي كان هينهار. اللي حصل العكس: الموديل لسه بيلاقي متطلبات الأمن، بس مش قادر يبطّل يلاقيها. دي بصمة prior shift، مش بصمة موديل مش فاهم النص.\n\nاللوحة (c) بتقول إن الـ prompted models عندهم نفس العيب من مصدر تاني: دقّتهم على FR/NFR بتترتّب مع قد إيه هما ضابطين الـ prior غلط، بـ Spearman rho 0.95. هفصّلها بعد شريحتين.\n\nوالتشخيص ده مبشّر: الـ prior shift ممكن يتصلّح بـ threshold أو prior adjustment من غير أي labels من الكوربس الجديد. ما طبّقناهوش عشان ده هيغيّر الحاجة اللي بنقيسها، وسايبينه كخطوة جاية واضحة.\n\nلو سألوك: هل الـ vocabulary مالهاش أي دور؟ لأ، ليها دور والورقة بتقوله زي ما اتقاس. الشريحة الجاية بتوري إن الصورة مش موحّدة في كل الاتجاهات. لكن العنصر المسيطر في أكبر انهيار شفناه هو prior الموديل جابه معاه.",
+   "sources": [
+    "main.tex:549-558",
+    "main.tex:571-581",
+    "main.tex:589-594",
+    "main.tex:274-277",
+    "main.tex:560-569"
+   ]
+  },
+  {
+   "id": "not-uniform",
+   "layout": "two_column",
+   "title": "Reported as measured: not uniform — and prior shift is correctable",
+   "left_heading": "What does not fit the simple story",
+   "bullets": [
+    "RoBERTa carries less source prior across: 19.7% predicted vs 12.9% true — and loses less accuracy",
+    "Reverse direction (train PROMISE_exp → test SecReq): both encoders predict below target",
+    "33.6% and 29.1% predicted security vs 39.9% true — content differences contribute there too",
+    "Supported claim: the largest collapse's dominant term is a prior the model brought with it"
+   ],
+   "right_heading": "Why the diagnosis is encouraging",
+   "right_bullets": [
+    "Prior shift is correctable: threshold or prior adjustment (Saerens et al. 2002; Quiñonero-Candela et al. 2009)",
+    "Such adjustment needs no labels from the target corpus",
+    "Applying it would change the quantity measured — transfer as it happens today",
+    "Deliberately left as the obvious next step: future work"
+   ],
+   "takeaway": "We report the asymmetry rather than smoothing it; the claim is scoped to the dominant term of the largest collapse.",
+   "notes_ar": "في الشريحة اللي فاتت قلت إن الآلية هي base-rate shift. بس أنا عايزة أكون أمينة مع الداتا: الصورة مش موحّدة، وإحنا بنبلّغها زي ما قسناها بالظبط.\n\nعلى الشمال: أول حاجة، RoBERTa بتنقل من الـ prior بتاع كوربس التدريب أقل من BERT. بتقول security على 19.7% من العناصر، والنسبة الحقيقية 12.9%. وعشان كده بتخسر accuracy أقل. تاني حاجة، في الاتجاه العكسي — لما ندرّب على PROMISE_exp ونختبر على SecReq — الاتنين encoders بيتوقعوا security أقل من النسبة الحقيقية: 33.6% و29.1% مقابل 39.9%. يعني هناك اختلاف المحتوى بين الكوربسين بيساهم برضه، مش الـ prior لوحده.\n\nفإيه اللي الدليل بيدعمه فعلاً؟ إن المصطلح المسيطر في أكبر انهيار شفناه — BERT من 0.923 لـ 0.528 — هو prior الموديل جابه معاه من كوربس التدريب. الادّعاء محدود بالحالة دي وبس، ومش بنعمّمه على كل حاجة.\n\nعلى اليمين: ليه ده تشخيص مبشّر؟ لأن الـ prior shift ممكن يتصحّح. فيه طرق معروفة — threshold adjustment أو prior adjustment، من Saerens 2002 وQuiñonero-Candela 2009 — وكلها محتاجة تعرف نسبة الكلاس في الداتا الجديدة بس، مش محتاجة أي labels من الكوربس الهدف. إحنا سبناها عمداً، لأن لو طبقناها هنبقى بنقيس حاجة تانية: إحنا عايزين نقيس الـ transfer زي ما بيحصل النهارده فعلاً في الممارسة. فدي الخطوة القادمة الواضحة.\n\nلو سألوك: ليه مطبّقتيش الـ correction وخلاص؟ الرد: لأن سؤال البحث عن الـ transfer الخام زي ما بيتعمل في الـ practice، والتصحيح بيغيّر الكمية اللي بنقيسها — بس هو أول حاجة في الـ future work.",
+   "sources": [
+    "main.tex:560-569",
+    "main.tex:552-558",
+    "main.tex:521-524",
+    "main.tex:292-293"
+   ]
+  },
+  {
+   "id": "prompted-prior",
+   "layout": "stats",
+   "title": "Prompted models mis-set the same prior — from a different source",
+   "stats": [
+    {
+     "value": "54.2%",
+     "label": "true NFR share on FR/NFR"
+    },
+    {
+     "value": "14.9%",
+     "label": "NFR predicted by Qwen2.5-3B — the lowest"
+    },
+    {
+     "value": "43.4%",
+     "label": "NFR predicted by Llama-3.3-70B — the highest, still below truth"
+    },
+    {
+     "value": "ρ = 0.95",
+     "label": "Spearman rank correlation, accuracy vs miscalibration, eight reportable models"
+    }
+   ],
+   "bullets": [
+    "Every prompted model predicts NFR far less often than the true share",
+    "The small open models' FR/NFR 'collapse' is a systematic bias toward FR, not an inability to read",
+    "Same defect as the transferred encoder, acquired from pre-training rather than a training corpus"
+   ],
+   "takeaway": "Miscalibration of the class prior explains most of the prompted models' FR/NFR error.",
+   "notes_ar": "دلوقتي بناخد نفس الأداة اللي استخدمناها على الـ encoders ونوجّهها على الذراع التاني: الموديلات الـ prompted.\n\nنبص على تاسك FR/NFR. الـ prior — يعني نسبة الكلاس في الداتا — للـ NFR الحقيقي 54.2%. يعني أكتر من نص العناصر NFR. لكن كل موديل prompted، من غير استثناء، بيقول NFR أقل بكتير من كده. أقل واحد Qwen2.5-3B: بيقول NFR على 14.9% بس من العناصر. وأعلى واحد Llama-3.3-70B: 43.4%، ولسه أقل من الحقيقة.\n\nوالحاجة المهمة: لما نرتّب الموديلات التمانية حسب الـ accuracy، ونرتّبهم حسب قد إيه هما غلطانين في الـ prior ده، الترتيبين بيتطابقوا تقريباً. Spearman rho — وده معامل ارتباط بين ترتيبين، لو طلع 1 يبقى نفس الترتيب بالظبط — طلع 0.95 على الموديلات التمانية اللي عدّت الـ reportability gate.\n\nيعني إيه؟ يعني 'الانهيار' اللي شفناه للموديلات الصغيرة على FR/NFR في رسمة RQ1 مش معناه إنها مش قادرة تقرا المتطلب. ده انحياز منهجي إنها تجاوب FR. نفس العيب اللي شفناه في الـ encoder المنقول — بس المصدر مختلف: الـ encoder جاب الـ prior من كوربس التدريب، والموديل الـ prompted جابه من الـ pre-training.\n\nودي قوة في التصميم: نفس الـ instrument، نفس العناصر، نفس الـ scorer على الذراعين. مش بنقارن رقمين من ورقتين مختلفتين.\n\nلو سألوك: الـ rho ده على 8 نقط بس، ده كفاية؟ الرد: صح، العينة صغيرة وإحنا بنقدّمها كدليل داعم مش كنتيجة لوحدها، والشريحة الجاية بتدّي الدليل السببي من تجربة الصياغة.",
+   "sources": [
+    "main.tex:589-596",
+    "main.tex:574-581"
+   ]
+  },
+  {
+   "id": "phrasing",
+   "layout": "chart",
+   "title": "Re-wording the question moves the prior — the link is causal",
+   "chart": {
+    "type": "bar",
+    "categories": [
+     "base",
+     "terse",
+     "verbose"
+    ],
+    "series": [
+     {
+      "name": "Gemma-2-2B — SecReq security",
+      "values": [
+       0.827,
+       0.343,
+       0.828
+      ]
+     }
+    ],
+    "y_label": "macro-F1 (Gemma-2-2B, SecReq security)",
+    "y_min": 0,
+    "y_max": 1
+   },
+   "bullets": [
+    "Nine paired model × task cells: median base/terse/verbose spread only 0.044 — extreme 0.485",
+    "Terse is the only leading yes/no phrasing: Gemma-2-2B answers security for 96.7% of SecReq, 51.3% of PROMISE_exp (true 39.7%, 12.7%)",
+    "Qwen2.5-7B shifts the same way but less far",
+    "Not a formatting artefact: the strict parser accepted 99.98% of 11,518 responses — well-formed, simply wrong"
+   ],
+   "takeaway": "Rewording the question re-set the model's prior exactly as re-training on another corpus re-set the encoder's (cf. Zhao et al. 2021; Lu et al. 2022).",
+   "notes_ar": "الشريحة اللي فاتت كانت ارتباط. دي بقى سببية: إحنا مغيّرناش حاجة غير صياغة السؤال نفسه.\n\nفي الـ phrasing sub-study عندنا تلات صياغات لنفس التعليمة: base، وterse، وverbose. جرّبناهم على 9 خلايا model × task، كل خلية paired — يعني نفس العناصر بالظبط تحت التلات صياغات. في أغلب الخلايا الفرق صغير: الـ median spread في الـ macro-F1 بين التلاتة 0.044 بس. لكن الحالة القصوى 0.485، وهي اللي في الرسم: Gemma-2-2B على تاسك الأمن في SecReq. الـ base بتدّي 0.827، والـ verbose 0.828 — تقريباً نفس الرقم — لكن الـ terse تنزل لـ 0.343.\n\nليه؟ الـ terse هي الصياغة الوحيدة اللي على شكل سؤال نعم/لا موجّه. وتحتها Gemma قالت 'security' على 96.7% من عناصر SecReq و51.3% من عناصر PROMISE_exp. النسب الحقيقية في الـ sub-study دي 39.7% و12.7%. Qwen2.5-7B اتحرّك في نفس الاتجاه بس أقل.\n\nوهنا نقطة مهمة أتوقع تتسأل: هل ده مشكلة parsing؟ لأ. الـ strict parser بتاعنا قبل 99.98% من الـ 11,518 رد في الـ sub-study. يعني الإجابات كانت صحيحة الشكل — كلمة واحدة زي ما طلبنا — بس غلط في المحتوى. ودي قوة الـ strict parsing: إحنا مش بنخفي الغلط ورا الـ format.\n\nالخلاصة: إعادة صياغة السؤال ظبّطت الـ prior بتاع الموديل بالظبط زي ما إعادة التدريب على كوربس تاني ظبّطت الـ prior بتاع الـ encoder. ودي نفس الـ instability اللي وراها شغل الـ calibration وترتيب الأمثلة في أدبيات الـ prompting، زي Zhao 2021 وLu 2022.\n\nلو سألوك: ليه النسب هنا 39.7% و12.7% مش 39.9% و12.9% زي جدول الكوربس؟ الرد: دول النسب اللي الورقة بتذكرها لعناصر الـ sub-study نفسها، والجدول بيدّي نسبة الكوربس الكامل. الاتنين في الورقة، والفرق صغير جداً ومش بيغيّر الاستنتاج.",
+   "sources": [
+    "main.tex:598-611",
+    "main.tex:385-387",
+    "main.tex:292-293"
+   ]
+  },
+  {
+   "id": "few-shot",
+   "layout": "two_column",
+   "title": "Few-shot helps precisely where the exemplars carry prior information",
+   "left_heading": "Binary tasks (FR/NFR, security) — 54 comparisons",
+   "bullets": [
+    "Mean effect −0.007 macro-F1 — net negative",
+    "The 30 BH-significant effects average −0.027",
+    "Labels are a familiar convention: the model already has a prior, examples mostly perturb it",
+    "Tang et al.'s over-prompting effect, reproduced",
+    "k ∈ {2, 4, 8} exemplars in total, class-balanced"
+   ],
+   "right_heading": "NFR sub-types — 36 comparisons",
+   "right_bullets": [
+    "Mean effect +0.062 — uniformly positive",
+    "All 14 BH-significant effects are gains, averaging +0.114",
+    "An unfamiliar eleven-class taxonomy: the exemplars are the only statement of what the classes are",
+    "k ∈ {1, 2} per class, carved out before the frames — never a test item"
+   ],
+   "takeaway": "90 paired comparisons on the six local models — the only tier that ran few-shot — median gain +0.024; the sign is decided by whether exemplars supply a missing prior.",
+   "notes_ar": "تالت دليل على نفس الآلية: الـ few-shot. يعني بنحط أمثلة معلّمة جوه الـ prompt قبل السؤال.\n\nعملنا 90 مقارنة paired على الست موديلات المحلية — وده المستوى الوحيد اللي شغّل few-shot، لأن الـ hosted والـ commercial اشتغلوا zero-shot بس تحت حدود الـ rate limits. كل مقارنة بتقارن نفس الموديل، نفس التاسك، نفس العناصر، مع أمثلة ومن غير. الـ median gain الإجمالي +0.024 macro-F1 — يعني إيجابي بس صغير. لكن الرقم ده بيخبّي انقسام واضح.\n\nعلى الشمال، التاسكات الـ binary — FR/NFR والأمن — 54 مقارنة، والتأثير في المتوسط سلبي: −0.007. ولما نفلتر على الـ 30 مقارنة اللي طلعت significant بعد تصحيح BH — وده تصحيح عشان إحنا عاملين مقارنات كتير ومش عايزين نتيجة تطلع significant بالصدفة — متوسطهم −0.027. يعني الأمثلة بتضرّ شوية. ليه؟ لأن الـ labels دي convention مألوفة — الموديل عنده prior جاهز من الـ pre-training، والأمثلة بتزحزحه وبس. ده تأثير الـ over-prompting اللي Tang وزملاؤه وصفوه، واتكرر عندنا.\n\nعلى اليمين، الـ NFR sub-types — 36 مقارنة — التأثير إيجابي بالكامل: متوسط +0.062، وكل الـ 14 significant منهم مكاسب، بمتوسط +0.114. هنا الـ taxonomy 11 كلاس مش مألوفة، والأمثلة هي التعريف الوحيد اللي الموديل بيشوفه للكلاسات دي. الأمثلة بتنقل الـ prior اللي ناقص.\n\nونقطة منهجية مهمة: الأمثلة اتشالت من الكوربس قبل تكوين الـ evaluation frames، فمفيش مثال هو نفسه item في الاختبار — مفيش leakage. والأمثلة deterministic وclass-balanced، فمفيش عشوائية في اختيارها.\n\nلو سألوك: ليه مجرّبتوش few-shot على الـ 70B وGemini؟ الرد: دول اشتغلوا zero-shot بس بسبب حدود الـ rate limits عند المزوّدين، وده مذكور صراحة في الورقة كحدّ للدراسة.",
+   "sources": [
+    "main.tex:613-622",
+    "main.tex:382-388"
+   ]
+  },
+  {
+   "id": "three-sources",
+   "layout": "comparison",
+   "title": "One defect, three sources",
+   "comparison": {
+    "left": {
+     "heading": "Fine-tuned encoder — prior from the training corpus",
+     "items": [
+      "Transferred BERT: 44.2% security predicted vs 12.9% true (source prior 39.9%)",
+      "Signature: precision 0.847 → 0.210 while recall 0.888 → 0.720",
+      "Consequence: 0.923 → 0.528 macro-F1 on identical items (−42.8%)",
+      "Remedy implied: label-free prior / threshold adjustment (future work)"
+     ]
+    },
+    "right": {
+     "heading": "Prompted LLM — prior from pre-training and from the wording",
+     "items": [
+      "Source 2, pre-training: NFR predicted 14.9%–43.4% vs 54.2% true; ρ = 0.95 with accuracy",
+      "Source 3, wording: terse phrasing → security for 96.7% of SecReq items; spread up to 0.485",
+      "Signature: well-formed answers (99.98% parsed), wrong prior",
+      "Remedy implied: exemplars help only where they carry the prior (sub-types +0.114; binary −0.027)"
+     ]
+    }
+   },
+   "takeaway": "The task needs a class prior that cannot be read off the text; each approach acquires one somewhere it should not — so neither is safe to deploy on an in-distribution score alone.",
+   "notes_ar": "ده الملخص لجزء الآلية كله، وهو الادّعاء المركزي في الرسالة: عيب واحد، تلات مصادر.\n\nالتاسك بتاعنا محتاج prior للكلاس — يعني الموديل لازم يكون عنده فكرة عن نسبة كل كلاس في الداتا — والـ prior ده مش ممكن يتقري من نص المتطلب لوحده. فكل approach بياخده من مكان مش المفروض ياخده منه.\n\nالمصدر الأول، على الشمال: الـ encoder بياخد الـ prior من كوربس التدريب. BERT المنقول قال security على 44.2% من العناصر، والحقيقة 12.9%، وكوربس التدريب كان 39.9%. البصمة: الـ precision انهارت من 0.847 لـ 0.210، لكن الـ recall نزلت أقل بكتير، من 0.888 لـ 0.720. الموديل لسه بيلاقي متطلبات الأمن، بس مش قادر يبطّل يلاقيها. والنتيجة: macro-F1 من 0.923 لـ 0.528 على نفس العناصر بالظبط، يعني −42.8%. والعلاج المفهوم ضمناً: prior أو threshold adjustment من غير labels، وده future work.\n\nالمصدر التاني والتالت، على اليمين: الموديل الـ prompted بياخد الـ prior من الـ pre-training — NFR متوقّع من 14.9% لـ 43.4% مقابل 54.2% حقيقي، وSpearman rho 0.95 مع الـ accuracy — ومن صياغة السؤال: الـ terse خلّت Gemma تقول security على 96.7% من SecReq، بفرق في الـ macro-F1 لحد 0.485. البصمة: إجابات صحيحة الشكل، 99.98% اتقبلت من الـ parser، بس الـ prior غلط. والعلاج: الأمثلة بتساعد بس لما تنقل الـ prior — +0.114 على الـ sub-types، −0.027 على الـ binary.\n\nالخلاصة: مفيش عيلة من الاتنين معايرة على الكوربس اللي قدامها. وعشان كده مفيش عيلة آمنة للـ deployment على درجة in-distribution لوحدها. وده اللي بيوصّلنا لسؤال التكلفة في RQ3.\n\nلو سألوك: هل ده معناه إن الاتنين بنفس السوء؟ الرد: لأ — عيب الـ encoder قابل للتصحيح من غير labels وهو أرخص بكتير زي ما هنشوف في RQ3؛ النقطة إن ولا واحد فيهم ينفع يتنشر بناءً على درجة in-distribution بس.",
+   "sources": [
+    "main.tex:624-629",
+    "main.tex:552-558",
+    "main.tex:521-523",
+    "main.tex:589-607",
+    "main.tex:613-619"
+   ]
+  },
+  {
+   "id": "cost-frontier",
+   "layout": "figure",
+   "title": "RQ3 — The accuracy–cost frontier: encoders 9–47× cheaper, training repaid within 46–552 items",
+   "figure": "fig_cost",
+   "bullets": [
+    "Encoder inference $0.0024 per 1,000 classifications vs $0.0216–$0.1132 prompted: 9–47×, 18× at medians (prompted median $0.0439)",
+    "One-off fine-tuning negligible: median $0.0093 per deployable model, about 277 GPU-seconds",
+    "Break-even N* over all 276 encoder-vs-alternative pairings: 46–552 items, median 215",
+    "Pareto frontier: 10 cells, 9 encoders; the single prompted point is 4-bit Qwen2.5-7B on SecReq security",
+    "Buys +0.011 macro-F1 for ≈19× the cost per item: strongest free fallback where transfer is measured"
+   ],
+   "takeaway": "Cost is what makes the transfer finding a real trade-off rather than a verdict.",
+   "notes_ar": "دلوقتي نيجي للـ RQ3: التمن. الشكل ده فيه لوحتين: اللوحة (a) هي خلية SecReq security، الخلية الوحيدة اللي موديل prompted بيتقدم فيها، واللوحة (b) هي الـ break-even على كل الأزواج.\nنبدأ بالـ inference. الـ encoder بيكلّف 0.0024 دولار لكل ألف تصنيف على إيجار T4 مفترض. البدائل الـ prompted من 0.0216 لـ 0.1132 دولار للألف، يعني من 9 لـ 47 مرة أغلى، و18 مرة لو قارنّا الـ medians، والـ median بتاع الـ prompted 0.0439.\nطيب والتدريب نفسه؟ رخيص جداً: الـ median للـ fine-tuning 0.0093 دولار للموديل الواحد، حوالي 277 ثانية GPU على كل الـ folds.\nهنا بنستخدم فكرة الـ break-even، يعني بعد كام item التدريب يبقى طلّع تمنه: بنقسم تكلفة التدريب على الفرق في تكلفة الـ item الواحد بين البديل والـ encoder. حسبناها على كل الـ 276 زوج encoder ضد بديل: من 46 لـ 552 عنصر، والـ median 215. يعني بعد ميتين item تقريباً الـ encoder بقى أرخص فعلاً بكل حاجة.\nبعدين الـ Pareto frontier، يعني الخلايا اللي مفيش خلية تانية أدق منها وأرخص منها في نفس الوقت: 10 خلايا، 9 منهم encoders. النقطة الوحيدة الـ prompted هي Qwen2.5-7B بـ 4-bit على SecReq security: بتشتري +0.011 macro-F1 بحوالي 19 ضعف التكلفة للـ item. وده بالظبط أقوى fallback مجاني في الخلية الوحيدة اللي بنقيس فيها الـ transfer.\nالفكرة الأساسية: التمن هو اللي بيحوّل نتيجة الـ transfer من حكم نهائي لـ trade-off حقيقي. الـ encoder أرخص بمرتبة كاملة، بس بيقع لما الداتا تتغير.\nملحوظة: المدى 0.0216 لـ 0.1132 ده على كل الخلايا الـ reportable، والجدول اللي جاي بيجمّع بالمستوى، فالأرقام شكلها مختلف بس الاتنين من الورقة.\nلو سألوك: هو تقدّم Qwen2.5-7B ده significant؟ لأ: 0.846 مقابل 0.836 للـ BERT، McNemar p = 0.696 وبعد BH 0.774، مش significant.",
+   "sources": [
+    "main.tex:631-643",
+    "main.tex:652-659",
+    "main.tex:469-471",
+    "main.tex:148-152",
+    "tables/cost_stats.json"
+   ]
+  },
+  {
+   "id": "cost-latency",
+   "layout": "table",
+   "title": "RQ3 — Cost and latency by tier",
+   "table": {
+    "headers": [
+     "Tier",
+     "Models",
+     "USD per 1,000",
+     "Median latency (s)",
+     "Training (USD)"
+    ],
+    "rows": [
+     [
+      "Fine-tuned encoder",
+      "4",
+      "0.0024",
+      "0.016",
+      "0.0093"
+     ],
+     [
+      "Open-weight, local (4-bit)",
+      "6",
+      "0.0312–0.0522",
+      "0.194–0.356",
+      "—"
+     ],
+     [
+      "Open-weight, hosted API",
+      "1",
+      "0.0704",
+      "0.095",
+      "—"
+     ],
+     [
+      "Commercial API",
+      "1",
+      "0.0248",
+      "0.614",
+      "—"
+     ]
+    ]
+   },
+   "bullets": [
+    "Median latency: encoders 0.016 s; hosted 70 B 0.095 s (fastest prompted tier); local 0.19–0.36 s; commercial 0.61 s",
+    "Free-tier queueing inflates the hosted means by up to two orders of magnitude — all projections use medians",
+    "Table shows per-model figures by tier; the $0.0216–$0.1132 range on the previous slide spans all reportable prompted cells"
+   ],
+   "takeaway": "Latency behaves differently from cost: the hosted 70 B is the fastest prompted tier, the commercial API the slowest.",
+   "notes_ar": "الجدول ده بيجمّع التمن والـ latency بالمستوى. أربع مستويات: الـ encoders الأربعة، ستة موديلات مفتوحة محلية بـ 4-bit، موديل واحد hosted هو Llama-3.3-70B، وموديل تجاري واحد هو Gemini 3.1 Flash-Lite.\nالتمن للألف تصنيف: الـ encoder 0.0024 دولار. المحلي من 0.0312 لـ 0.0522. الـ hosted 0.0704. والتجاري 0.0248. لاحظوا إن التجاري هو أرخص مستوى prompted في الجدول، بس زي ما هنشوف هو الأبطأ.\nالـ latency هنا median لكل request: الـ encoder 0.016 ثانية. الـ hosted بالـ 70 مليار 0.095 ثانية، وده أسرع مستوى prompted. المحلي من 0.194 لـ 0.356. والتجاري 0.614 ثانية.\nليه median مش mean؟ الـ median هو القيمة اللي في النص لما نرتّب كل الـ requests، فمش بتتأثر بشوية requests بطيئة جداً. وإحنا شغالين على free tiers، فالطوابير عند الـ provider بتضخّم متوسط الـ hosted لحد مرتبتين، يعني مية مرة، والطابور ده مش خاصية الموديل. عشان كده كل الإسقاطات الزمنية بالـ median، والـ mean المتضخّم بنبلّغه لوحده.\nوالتدريب: 0.0093 دولار للـ encoder، ومفيش تدريب للباقي.\nالخلاصة إن الـ latency بتتصرف مختلف عن التمن: الـ hosted أغلى مستوى prompted في الجدول بس أسرع، والتجاري أرخص بس أبطأ.\nلو سألوك: الأسعار دي جاية منين؟ الحوسبة المحلية متسعّرة كإيجار T4 على AWS بـ 0.5260 دولار في الساعة، والـ APIs بسعر الـ token المعلن: Gemini 0.25 و1.50 دولار للمليون input وoutput، وLlama-3.3-70B 0.59 و0.79، وكل ده متجمّد في كل صف وقت التوليد.",
+   "sources": [
+    "tables/tab_cost.tex",
+    "main.tex:645-650",
+    "main.tex:442-447",
+    "main.tex:454-456"
+   ]
+  },
+  {
+   "id": "discussion",
+   "layout": "two_column",
+   "title": "Discussion: the regime is part of the claim",
+   "left_heading": "The regime is part of the claim",
+   "bullets": [
+    "'Which is better?' flips between two protocols the literature treats as interchangeable — same items, same scorer",
+    "An in-distribution-only benchmark is not a weaker version of one reporting transfer; it can report the opposite",
+    "Requirements-classification results should state the regime as part of the claim",
+    "'Generalisation' should mean held-out projects or independent corpora, not transfer across tasks on one dataset"
+   ],
+   "right_heading": "Contamination cuts in our favour",
+   "right_bullets": [
+    "Both corpora are old, small and public → prompted in-domain scores may be inflated by pre-training contamination",
+    "That bias overstates the prompted models in-domain — exactly where we report encoders winning → conservative",
+    "It cannot produce the cross-dataset reversal: it would help the prompted models in both regimes equally"
+   ],
+   "takeaway": "The most consequential finding is not that one model class is better — it is that the answer depends on the regime.",
+   "notes_ar": "نيجي للمناقشة. أهم نتيجة في الشغل ده مش إن موديل أحسن من موديل. أهم نتيجة إن سؤال \"مين أحسن؟\" بيتقلب بالكامل بين بروتوكولين الأدبيات بتعاملهم كأنهم حاجة واحدة، وده على نفس الكوربس ونفس الـ items ونفس الـ scorer. اللي اتغير بس هو الـ regime.\nمعنى كده إن الـ benchmark اللي بيبلّغ أرقام in-distribution بس مش نسخة أضعف من benchmark بيبلّغ transfer، ده ممكن يطلّع الاستنتاج المعاكس. عشان كده بنقترح حاجتين: نتائج تصنيف المتطلبات لازم تذكر الـ regime كجزء من الـ claim نفسه، وكلمة generalisation لازم تعني projects محجوزة بره التدريب أو كوربس مستقل، مش نقل بين tasks على نفس الداتاسيت.\nالعمود التاني بيرد على اعتراض متوقع: الـ contamination، يعني إن الموديل الكبير ممكن يكون شاف الكوربس أثناء الـ pre-training، لأن الكوربسين قدام وصغيرين وعامّين. لو ده حصل، فهو بيضخّم درجات الـ prompted models في الـ in-domain، وده بالظبط المكان اللي بنقول فيه إن الـ encoders كسبت. يعني ميزة الـ encoder in-domain محافظة: لو فيه انحياز فهو ضدنا مش معانا.\nوالأهم إن الـ contamination مش ممكن تنتج الانقلاب في الـ cross-dataset، لأنها هتساعد الـ prompted models في النظامين بالتساوي.\nوكل ده قابل للتحقق: الـ pipeline والـ splits المجمّدة ومخزن التنبؤات والـ scripts كلهم متاحين، وكل رقم بيتعاد حسابه من غير ما نشغّل موديل.\nلو سألوك: إزاي متأكدة إن الـ contamination مش سبب الانقلاب؟ الـ prompted models مش بتتدرب على حاجة، فدرجاتها ثابتة بين النظامين بالبناء. اللي اتحرك هو الـ encoder لما اتدرب على كوربس تاني، والـ contamination مش بتفسّر ده.",
+   "sources": [
+    "main.tex:665-673",
+    "main.tex:684-689",
+    "main.tex:691-694",
+    "main.tex:322-326"
+   ]
+  },
+  {
+   "id": "decision-rule",
+   "layout": "comparison",
+   "title": "A decision rule for practitioners",
+   "comparison": {
+    "left": {
+     "heading": "Fine-tune a 110 M-parameter encoder when…",
+     "items": [
+      "You hold a few hundred labelled requirements from the domain you will operate in",
+      "Any non-trivial volume: training repaid within 46–552 items (median 215)",
+      "Most accurate in-domain (67 wins, 0 losses) and by far the cheapest ($0.0024 per 1,000)",
+      "The domain is stable and labelled"
+     ]
+    },
+    "right": {
+     "heading": "Prompt a mid-size quantised open model when…",
+     "items": [
+      "Entering an unlabelled or shifting domain",
+      "Gives up in-domain accuracy but degrades gracefully: prompted scores move only −0.034 to +0.163 across corpora",
+      "Runs free on one consumer-class GPU (4-bit on a free-tier T4)",
+      "Strongest free fallback where transfer is measured: 4-bit Qwen2.5-7B (0.846 on SecReq security)"
+     ]
+    }
+   },
+   "takeaway": "The worst option is the implicit default of much recent work — fine-tuning on one corpus and assuming the result transfers.",
+   "notes_ar": "دي قاعدة قرار عملية، عشان الفريق اللي هيستخدم النتيجة يعرف يعمل إيه.\nالحالة الأولى: لو عندك كام مية متطلب معنون من نفس المجال اللي هتشتغل فيه، وأي حجم شغل معقول، اعمل fine-tune لـ encoder بـ 110 مليون باراميتر. ليه؟ لأنه الأدق in-domain: 67 فوز وصفر خسارة في الاختبارات الـ paired. والأرخص بكتير: 0.0024 دولار للألف تصنيف، والتدريب بيطلّع تمنه بعد 46 لـ 552 عنصر، والـ median 215. بشرط إن المجال ثابت ومعنون.\nالحالة التانية: لو داخل على مجال من غير labels أو بيتغير، prompt موديل مفتوح متوسط الحجم ومضغوط بـ 4-bit. هو بيتنازل عن دقة الـ in-domain، بس بيتدهور بلطف: لأنه مش بيتدرب على حاجة، درجاته بتتحرك بس مع صعوبة الكوربس، من −0.034 لـ +0.163. قارنوا ده بالـ BERT اللي خسر 42.8%. وبيشتغل مجاناً على GPU واحد من فئة المستهلك، زي الـ T4 الـ free tier اللي استخدمناه. أقوى fallback مجاني في الخلية اللي بنقيس فيها الـ transfer هو Qwen2.5-7B، بـ 0.846 على SecReq security.\nوالأسوأ على الإطلاق هو الافتراض الضمني في شغل كتير حديث: تعمل fine-tune على كوربس واحد وتفترض إن النتيجة هتنقل. إحنا قيسنا ده بالظبط، وشفنا إنه بيقع.\nلو سألوك: الـ break-even بيحسب تكلفة الـ labelling البشري؟ لأ، N* بيحسب تكلفة الحوسبة بس، وده في صالح الـ encoder، وبنقوله صراحة في الـ threats. ولو سألوك ليه مش الـ commercial API كـ fallback: هو مش مجاني، وفي شغلنا اشتغل على n حوالي 60 للخلية، فـ 23 من 26 مقارنة غير حاسمة.",
+   "sources": [
+    "main.tex:675-682",
+    "main.tex:638-643",
+    "main.tex:469-470",
+    "main.tex:483-484",
+    "main.tex:521-526",
+    "main.tex:634",
+    "main.tex:342-343",
+    "main.tex:700-701"
+   ]
+  },
+  {
+   "id": "threats",
+   "layout": "table",
+   "title": "Threats to validity",
+   "table": {
+    "headers": [
+     "Category",
+     "Threat",
+     "Direction / mitigation"
+    ],
+    "rows": [
+     [
+      "Internal",
+      "Commercial arm at n ≈ 60 per cell; 23 of 26 paired comparisons inconclusive",
+      "'Never significantly beaten' partly reflects limited power"
+     ],
+     [
+      "Internal",
+      "Free-tier quotas → missing-not-at-random dropout on some hosted configurations",
+      "Gate excludes affected cells rather than imputing"
+     ],
+     [
+      "Internal",
+      "Local models ran 4-bit quantised",
+      "May understate full-precision accuracy"
+     ],
+     [
+      "Internal",
+      "One seed per configuration",
+      "Small encoder-to-encoder margins not over-read"
+     ],
+     [
+      "Construct",
+      "GPU cost imputed from a published rental rate; token prices are 2026 list prices",
+      "Ratios more durable than absolutes"
+     ],
+     [
+      "Construct",
+      "N* is a pure cost crossover; human annotation cost excluded",
+      "Favours the encoder — stated explicitly"
+     ],
+     [
+      "Construct",
+      "Strict scoring counts format non-compliance as error",
+      "Matches deployment; differs from lenient protocols"
+     ],
+     [
+      "External",
+      "Security label sets differ: PROMISE_exp from the SE sub-class (non-functional by construction); SecReq any security-relevant sentence",
+      "Cross-dataset carries definitional as well as distributional shift, on one corpus pair"
+     ],
+     [
+      "External",
+      "Corpora small, dated, public; English requirements; one NFR taxonomy",
+      "Scope of the claims"
+     ],
+     [
+      "Conclusion",
+      "Multiplicity; split regeneration",
+      "All paired tests exact, corrected as one family; splits stored once (grouped-fold membership is library-version dependent)"
+     ]
+    ]
+   },
+   "takeaway": "Each limitation is either bounded by the design (gate, one-family correction, frozen splits) or reported with its direction stated — including where it favours us.",
+   "notes_ar": "وأخيراً التهديدات على الـ validity، بصراحة وباتجاه كل واحد.\nداخلياً: الذراع التجاري اشتغل على n حوالي 60 للخلية، و23 من 26 مقارنة paired غير حاسمة. يعني لما نقول إنه عمره ما اتغلب بشكل significant، ده جزء منه قلة الـ power، يعني القدرة على اكتشاف فرق حقيقي بعينة صغيرة. حصص الـ free tier عملت dropout مش عشوائي على بعض الـ hosted configs، والـ gate بتستبعد الخلية كلها بدل ما نعوّض، 6 من 87 خلية. الموديلات المحلية 4-bit، فممكن نكون بنقلّل من دقتها بالـ full precision. وseed واحد لكل config، فمش بنقرا الفروق الصغيرة بين encoder وencoder.\nالبناء: تكلفة الـ GPU مفترضة من سعر إيجار منشور مش فاتورة، وأسعار الـ tokens قوائم 2026، فالنسب أثبت من الأرقام المطلقة. N* بيحسب التكلفة بس وبيستبعد تكلفة الـ annotation البشرية، وده في صالح الـ encoder، وبنقوله صراحة. والـ scoring الصارم بيحسب المخالفة الشكلية غلط، وده مطابق للـ deployment بس مختلف عن البروتوكولات المتساهلة.\nخارجياً: تعريف الـ security label مختلف بين الكوربسين: PROMISE_exp من الـ SE sub-class فهو non-functional بالبناء، وSecReq أي جملة ليها علاقة بالأمن، فالـ cross-dataset فيه shift تعريفي كمان مش توزيعي بس، وعلى زوج كوربس واحد. والنتائج بالإنجليزي وعلى taxonomy واحدة للـ NFR.\nالاستنتاج: كل الاختبارات الـ paired exact ومصحّحة كعيلة واحدة، والـ splits متخزنة مرة واحدة ومش بتتولد تاني لأن الـ grouped folds بتعتمد على نسخة المكتبة.\nلو سألوك: ليه seed واحد؟ صحيح، وعشان كده الاستنتاجات الأساسية مبنية على 260 اختبار paired مصحّحين، مش على فرق صغير بين موديلين.",
+   "sources": [
+    "main.tex:700-725",
+    "main.tex:433-436",
+    "main.tex:428-432",
+    "main.tex:269-272"
+   ]
+  },
+  {
+   "id": "conclusion",
+   "layout": "stats",
+   "title": "Conclusion",
+   "stats": [
+    {
+     "value": "76,115",
+     "label": "predictions under one strict rule; 260 paired tests corrected as one family"
+    },
+    {
+     "value": "67–39–0 → 3–13–48",
+     "label": "encoder wins–ties–losses, in-domain → cross-dataset"
+    },
+    {
+     "value": "42.8%",
+     "label": "macro-F1 lost by the best in-domain encoder on identical items"
+    },
+    {
+     "value": "9–47×",
+     "label": "encoders cheaper per 1,000 classifications; training repaid within 46–552 items"
+    }
+   ],
+   "bullets": [
+    "In-domain encoders are never significantly beaten; across corpora prompted models win 48 of 64",
+    "Both families carry an uncalibrated class prior — from the training corpus, or from pre-training and wording",
+    "Two protocols the field treats as interchangeable return opposite rankings from the same data",
+    "Public pipeline, frozen splits, prediction store, regeneration scripts — every number reproduces without re-running a model"
+   ],
+   "takeaway": "An in-distribution score is not a partial answer, it can be the wrong one — so fine-tune for a stable labelled domain, and prompt when the distribution moves.",
+   "notes_ar": "في الآخر خليني ألخّص الشغل كله في أربع أرقام.\n\nالأول: 76,115 توقع. إحنا شغّلنا 12 كونفيجريشن — أربع encoders متدرّبين وتمن prompted LLMs — على تلات تاسكات وتلات أنظمة تقييم، وكل التوقعات دي اتحسبت بقاعدة صارمة واحدة: الإجابة اللي مش نافعة بتتحسب غلط. وكل مقارنة بين encoder وLLM كانت paired، يعني نفس الـ items بالظبط للموديلين، بـ McNemar اللي بيشوف مين غلط فين على نفس العناصر. والـ 260 اختبار اتصحّحوا كعيلة واحدة بـ Holm وBH، يعني حسبنا حساب إننا عاملين تجارب كتير، فمفيش نتيجة بتطلع significant بالصدفة.\n\nالتاني هو القصة كلها: in-domain الـ encoders كسبت 67 وتعادلت 39 وما خسرتش ولا مرة. cross-dataset، نفس الموديلات ونفس الـ scorer: 3 مكاسب و13 تعادل و48 خسارة — الـ prompted models كسبت 48 من 64.\n\nالتالت: أحسن encoder in-domain خسر 42.8% من الـ macro-F1 بتاعه على نفس الـ items لما اتغيّر كوربس التدريب بس. والسبب مش كلمات غريبة، السبب الـ prior — يعني نسبة الـ class في الداتا. الـ encoder شايله من كوربس التدريب، والـ prompted model شايله من الـ pre-training ومن صياغة السؤال. العيلتين مش معايرين على الداتا اللي قدامهم.\n\nالرابع: الـ encoders أرخص بـ 9 لـ 47 مرة لكل ألف classification، والتدريب بيطلّع تمنه بعد 46 لـ 552 item — ده الـ break-even، يعني بعد كام item التدريب يبقى طلّع تمنه.\n\nالخلاصة: بروتوكولين المجال بيعاملهم كأنهم واحد بيدّوا ترتيب عكسي من نفس الداتا. فالدرجة الـ in-distribution مش إجابة جزئية، ممكن تكون الإجابة الغلط. اعمل fine-tune لو عندك مجال مستقر ومعنون، واعمل prompt لما التوزيع يتحرك.\n\nوكل حاجة عامة: البايبلاين، والـ splits المجمّدة والمثبتة بالـ hash، والـ prediction store، والسكريبتات اللي بتطلّع كل جدول وشكل. كل رقم في الورقة بيتعاد من غير ما نشغّل موديل.\n\nلو سألوك: 'إيه أهم حاجة المجال لازم يغيّرها؟' — إن الـ regime يبقى جزء من الـ claim نفسها: لما نقول موديل أحسن، نقول أحسن تحت أنهي regime، وإن كلمة generalisation تعني مشاريع أو كوربس مش متشافين، مش تاسك تاني على نفس الداتا.",
+   "sources": [
+    "main.tex:731-739",
+    "main.tex:691-694",
+    "main.tex:79-81",
+    "main.tex:135-140",
+    "main.tex:148-152",
+    "main.tex:521-529",
+    "main.tex:624-629",
+    "main.tex:634-639",
+    "main.tex:665-673"
+   ]
+  },
+  {
+   "id": "thanks",
+   "layout": "title",
+   "title": "Thank you — questions?",
+   "subtitle": "Fatma El-Zahraa Samir · fatmaelzahraasamirabdelfattah@gmail.com · Faculty of Computers and Artificial Intelligence, Cairo University\nPipeline, frozen splits, prediction store and regeneration scripts are public",
+   "notes_ar": "شكراً لحضراتكم على وقتكم واهتمامكم. أنا جاهزة لأي أسئلة.\n\nلو حابين نرجع لأي جدول أو رقم، كل شريحة فيها المصدر من الورقة بالسطر، فنقدر نفتحه على طول. وزي ما قلت، البايبلاين والـ splits المجمّدة والـ prediction store والسكريبتات كلها عامة، فأي رقم حضراتكم عايزين تتأكدوا منه بيتعاد من غير ما نشغّل موديل.\n\nلو سألوك: 'إيه الخطوة الجاية؟' — أوضح خطوة هي تصحيح الـ prior: threshold أو prior adjustment، وده مش محتاج labels من الكوربس الهدف. ما عملناهوش في الورقة دي لأنه كان هيغيّر الحاجة اللي بنقيسها، فسبناه كخطوة جاية واضحة.",
+   "sources": [
+    "main.tex:53-56",
+    "main.tex:691-694",
+    "main.tex:566-569"
+   ]
+  },
+  {
+   "id": "backup-qa",
+   "layout": "two_column",
+   "title": "Backup — anticipated questions",
+   "left_heading": "Method and statistics",
+   "bullets": [
+    "Why McNemar? Paired on identical items; exact test on the disagreements only — no independence assumption between models",
+    "Why 260 as one family? Any split into sub-families would make the correction lenient; one family is the conservative choice",
+    "One seed? Yes — stated; the headline is a 42.8% drop of the same encoder, not a small encoder-to-encoder margin",
+    "4-bit local models? Needed for a free-tier T4; may understate full-precision accuracy — direction stated"
+   ],
+   "right_heading": "Validity and novelty",
+   "right_bullets": [
+    "Contamination? Would inflate prompted in-domain scores — where encoders win anyway — and cannot produce a cross-dataset reversal",
+    "Why not prior correction? It changes the quantity measured; we measure transfer as practised today — first item of future work",
+    "Novelty vs Binkhonain & Alfayaz / Tang et al.? They evaluate in-distribution without cost; we add cross-project, cross-dataset and cost on identical items",
+    "Power of the commercial arm? n ≈ 60 per cell, 23 of 26 inconclusive — reported as a limitation, not hidden"
+   ],
+   "notes_ar": "دي slide احتياطية، مش هتعرضيها إلا لو حد سأل. الإجابات المختصرة بالإنجليزي على الشاشة، ودي الإجابات الكاملة:\n\nليه McNemar؟ لأن الموديلين بيتقيّموا على نفس الـ items بالظبط، والاختبار بيبص بس على العناصر اللي اختلفوا فيها، فمش محتاج افتراض إن الموديلين مستقلين عن بعض. وexact يعني بنحسب الاحتمال بالظبط، وده أنسب للأعداد الصغيرة.\n\nليه الـ 260 كعيلة واحدة؟ لو قسمناهم عيلات صغيرة التصحيح كان هيبقى أخف وكان ممكن يطلع significant أكتر. عيلة واحدة هي الاختيار الأكثر تحفظاً ضدنا مش معانا.\n\nseed واحد؟ صحيح ومكتوب في الـ threats. لكن النتيجة الأساسية مش فرق صغير بين encoder وencoder، دي سقطة 42.8% لنفس الـ encoder على نفس الـ items، ومتأكدة بـ 260 اختبار paired.\n\n4-bit؟ عشان الموديلات تشتغل على كارت T4 مجاني واحد، وده جزء من سؤال RQ3 عن أرخص خيار مجاني. ممكن يقلّل دقتها شوية عن الـ full precision، وقلنا ده صراحة.\n\nالـ contamination؟ لو موجودة بتضخّم درجات الـ prompted في الـ in-domain، وده المكان اللي الـ encoders كسبت فيه أصلاً، فميزتنا محافظة. ومش ممكن تعمل انقلاب في الـ cross-dataset لأنها هتساعد الـ prompted في النظامين بالتساوي.\n\nليه ما صلّحناش الـ prior؟ لأن التصحيح هيغيّر الحاجة اللي بنقيسها، وإحنا عايزين نقيس الـ transfer زي ما بيتعمل في الممارسة النهارده. وده أول حاجة في الـ future work.\n\nالجديد عن Binkhonain وAlfayaz وTang؟ هما قاسوا in-distribution ومن غير تكلفة. إحنا ضفنا cross-project وcross-dataset والتكلفة، على نفس الـ items وبنفس الـ scorer وبتصحيح إحصائي كعيلة واحدة.\n\nقوة الذراع التجاري؟ n حوالي 60 للخلية، و23 من 26 مقارنة غير حاسمة، وقلناها كحد للدراسة مش خبّيناها.",
+   "sources": [
+    "main.tex:428-435",
+    "main.tex:684-706"
+   ]
+  }
+ ]
+}
