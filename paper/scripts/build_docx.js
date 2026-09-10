@@ -10,7 +10,7 @@ const {
 } = D;
 
 const doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'paper.json'), 'utf8'));
-const FIGDIR = path.join(__dirname, '..', 'figures');
+const FIGDIR = '/home/user/MSc./paper/figures';
 
 const FONT = 'Times New Roman';
 const BODY = 20;            // half-points => 10pt
@@ -136,12 +136,8 @@ const PROMPT_LINES = [
   'or property such as performance, security or usability.',
   'Answer with exactly one word: "FR" or "NFR".',
   '',
-  '⟨few-shot conditions only⟩',
-  'Examples:',
-  'Requirement: """exemplar"""   Answer: FR',
-  '… k class-balanced exemplars, carved out before the evaluation frames',
+  '⟨few-shot only: k exemplars here⟩',
   '',
-  'Now classify this one:',
   'Requirement:',
   '"""the requirement under test"""',
   '',
@@ -263,7 +259,7 @@ for (const b of doc.blocks) {
     if (b.wide) { flushTwoCol(); wideSection(parts); } else { buf.push(...parts); }
   } else if (b.type === 'promptbox') {
     buf.push(promptBox(COL_W));
-    buf.push(capFig({ number: b.number, caption: b.caption }));
+    buf.push(new Paragraph({ text: '', spacing: { after: 120 } }));
   }
 }
 

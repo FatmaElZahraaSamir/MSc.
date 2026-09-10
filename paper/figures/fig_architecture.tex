@@ -2,7 +2,7 @@
 %% One data path, two model families that differ only in whether they consume
 %% training data, one scoring path, and a regime axis only the encoders traverse.
 %% Encoder path: solid, upper.  Prompted path: dashed, lower.  (Greyscale-safe.)
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
 \begin{tikzpicture}[
   font=\footnotesize,
@@ -59,12 +59,6 @@
   \draw[->, draw=black!42, line width=0.55pt] (4.45,0.02) -- (5.30,0.02);
   \draw[->, draw=black!42, line width=0.55pt] (9.80,0.02) -- (10.65,0.02);
 \end{scope}
-\node[tag, anchor=north west, align=left, text width=176mm] at (-1.32,-3.02)
-  {\textbf{Solid (upper) path:} the fine-tuned encoders consume training folds
-   and are re-fitted at every station of the regime axis. \textbf{Dashed (lower)
-   path:} the prompted LLMs consume only test items, so their scores do not
-   change with the regime and form the fixed reference against which the
-   encoders' loss is measured.};
 
 \end{tikzpicture}
 \caption{Experimental architecture. One data path (left) feeds two model

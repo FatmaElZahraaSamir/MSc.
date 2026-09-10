@@ -126,7 +126,7 @@ def tab_main():
 # so the column simply does not apply to them and the table says so.
 def tab_loss():
     out = []
-    for j, (task, ds, regs) in enumerate(GROUPS):
+    for j, (task, ds, regs) in enumerate(g for g in GROUPS if g[0] == 'security'):
         label = {'security': 'Security', 'fr_nfr': 'FR/NFR',
                  'subtype_top4': 'NFR sub-types, top-4',
                  'subtype_top6': 'NFR sub-types, top-6',

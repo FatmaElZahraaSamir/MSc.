@@ -1,8 +1,13 @@
 # Paper — *Large Language Models for Software Requirements Classification: Cross-Dataset Generalization and Cost-Efficiency*
 
-An IEEE-format conference paper built directly from the seven-stage pipeline in
+An 8-page IEEE conference paper built directly from the seven-stage pipeline in
 the repository root. Every number in the paper is read back from a stored
 artefact; nothing is transcribed by hand.
+
+The 8-page limit is tight and the layout is tuned to it: Tables I and II are set
+at `\scriptsize`, float separation is reduced in the preamble, and the prompt
+template sits inline in Section III-E rather than as a captioned float. Adding a
+paragraph will usually push the last references onto a ninth page.
 
 ## Build
 
@@ -19,17 +24,14 @@ Requires `IEEEtran`, `booktabs`, `tikz`, `pifont`, `balance`, `microtype`
 |---|---|
 | `main.tex` | the paper; the only hand-written file |
 | `figures/fig_architecture.tex` | Fig. 1, the system-architecture diagram, pure TikZ |
-| `figures/fig_inversion.pdf` | Fig. 3, the regime reversal (grouped bars incl. the prompted models + verdict bars) |
-| `figures/fig_prior_shift.pdf` | Fig. 4, the shared failure mode (three panels) |
-| `figures/fig_cost.pdf` | Fig. 5, Pareto frontier and break-even |
+| `figures/fig_inversion.pdf` | Fig. 2, the regime reversal (grouped bars incl. the prompted models + verdict bars) |
+| `figures/fig_prior_shift.pdf` | Fig. 3, the shared failure mode (two panels) |
 | `tables/tab_main.tex` | the single results table: 12 configurations × 6 cells × every regime |
-| `tables/tab_loss.tex` | encoder relative loss under shift |
-| `tables/tab_prompt.tex` | phrasing sub-study, incl. the best-of-three oracle gain |
-| `tables/tab_cost.tex` | cost and latency by access tier, with the pricing basis |
+| `tables/tab_loss.tex`, `tab_prompt.tex`, `tab_cost.tex` | generated, but folded into prose at 8 pages; `*_stats.json` holds the values the prose quotes |
 | `scripts/make_figs.py` | regenerates the three data figures |
 | `scripts/make_tables.py` | regenerates the numeric table bodies and the `*_stats.json` files the prose quotes |
 
-Fig. 2 (the prompt template) is set inline in `main.tex`.
+The prompt template is set inline in `main.tex`, not as a numbered figure.
 
 ## Regenerating the numbers
 

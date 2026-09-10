@@ -347,6 +347,11 @@ for kind, chunk in pieces:
             para = m.group(2).strip()
             if not para:
                 continue
+        if para.startswith('\\begingroup') and '\\fbox' in para:
+            blocks.append(dict(type='promptbox'))
+            continue
+        if para.startswith('\\endgroup'):
+            continue
         if para.startswith('\\begin{enumerate}'):
             items = re.findall(r'\\item\s+(.*?)(?=\\item|\\end\{enumerate\})',
                                para, re.S)

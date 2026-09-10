@@ -1,3 +1,4 @@
 # Unzipped pipeline artefacts (regenerate by unzipping the results *.zip files)
 artefacts/
 paper/artefacts
+paper/scripts/paper.json

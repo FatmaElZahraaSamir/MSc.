@@ -76,12 +76,12 @@ def fig_prior_shift():
         d = s[(s.model_tag == tag) & (s.dataset == ds) & (s.eval_regime == reg)]
         return (d.y_pred == 'security').mean(), (d.y_true == 'security').mean()
 
-    fig = plt.figure(figsize=(8.0*CM, 6.95*CM))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.16, 1.0], width_ratios=[1.0, 1.06],
-                          hspace=1.02, wspace=0.52)
+    fig = plt.figure(figsize=(8.0*CM, 4.75*CM))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.10, 1.0], width_ratios=[1.0, 1.06],
+                          hspace=1.20, wspace=0.52)
     ax = fig.add_subplot(gs[0, :])
-    bx = fig.add_subplot(gs[1, 0])
-    cx = fig.add_subplot(gs[1, 1])
+    bx = None
+    cx = fig.add_subplot(gs[1, :])
 
     # -- (a) the transferred encoder reproduces the source corpus base rate
     prev = {ds: rate('bert-base-uncased-weighted', ds, 'in_domain')[1]
@@ -120,30 +120,6 @@ def fig_prior_shift():
     ax.set_title('(a) a fine-tuned encoder inherits its prior from its training corpus',
                  fontsize=7.2, loc='left', pad=27)
 
-    # -- (b) precision collapses, recall does not
-    cells = [('in_domain', 'in-dom.'), ('cross_project', 'x-proj.'),
-             ('cross_dataset', 'x-data.')]
-    P, R = [], []
-    for reg, _ in cells:
-        d = s[(s.model_tag == 'bert-base-uncased-weighted') &
-              (s.dataset == 'promise') & (s.eval_regime == reg)]
-        pr, rc = prf((d.y_true == 'security').values, (d.y_pred == 'security').values)
-        P.append(pr); R.append(rc)
-    x = np.arange(3); w = 0.34
-    b1 = bx.bar(x-w/2, P, w, color=C_ENC, edgecolor='white', linewidth=0.7, label='prec.')
-    b2 = bx.bar(x+w/2, R, w, color='white', edgecolor=C_ENC, linewidth=0.9,
-                hatch='/////', label='rec.')
-    for b, v in [(b1[2], P[2]), (b2[2], R[2])]:   # label only the decisive pair
-        bx.annotate(f'{v:.2f}', (b.get_x()+b.get_width()/2, v), xytext=(0, 1.6),
-                    textcoords='offset points', ha='center', fontsize=6.0, color=INK)
-    bx.set_xticks(x); bx.set_xticklabels([c[1] for c in cells], fontsize=6.2)
-    bx.set_ylim(0, 1.12); bx.set_yticks([0, 0.5, 1.0])
-    bx.set_ylabel('security class', fontsize=7)
-    bx.grid(axis='y'); bx.set_axisbelow(True)
-    bx.legend(frameon=False, ncol=2, loc='lower left', bbox_to_anchor=(-0.06, 0.97),
-              handlelength=1.0, columnspacing=0.7, handletextpad=0.35, fontsize=6.0)
-    bx.set_title('(b) BERT$_{\\mathrm{w}}$ on PROMISE', fontsize=7.0, loc='left', pad=13)
-
     # -- (c) prompted models: how well the prior is calibrated predicts accuracy
     TIER = {'gemini-3.1-flash-lite': 'commercial',
             'groq-llama-3.3-70b-versatile': 'open_hosted'}
@@ -170,7 +146,9 @@ def fig_prior_shift():
     cx.set_xlabel('predicted NFR share', fontsize=7, labelpad=1.5)
     cx.set_ylabel('accuracy', fontsize=7)
     cx.grid(True); cx.set_axisbelow(True)
-    cx.set_title('(c) 8 prompted models, FR/NFR', fontsize=7.0, loc='left', pad=13)
+    cx.set_title('(b) the 8 prompted models, FR/NFR: accuracy tracks how far the '
+                 'predicted class share sits from the true one',
+                 fontsize=7.0, loc='left', pad=4)
 
     fig.savefig(OUT+'fig_prior_shift.pdf')
     fig.savefig(OUT+'fig_prior_shift.png', dpi=300)
@@ -200,9 +178,9 @@ def fig_inversion():
     pmed = float(prompted.macro_f1.median())
     plo, phi = float(prompted.macro_f1.min()), float(prompted.macro_f1.max())
 
-    fig, (ax, bx) = plt.subplots(2, 1, figsize=(9.45*CM, 7.55*CM),
+    fig, (ax, bx) = plt.subplots(2, 1, figsize=(9.45*CM, 6.35*CM),
                                  gridspec_kw={'height_ratios': [1.52, 1.0],
-                                              'hspace': 0.72})
+                                              'hspace': 0.78})
 
     x = np.arange(3); w = 0.26
     series = [('BERT (weighted)', 'BERT$_\\mathrm{w}$', C_ENC, None, -w),
@@ -237,8 +215,6 @@ def fig_inversion():
     ax.set_xticks(x); ax.set_xticklabels(labels)
     ax.set_ylim(0, 1.13); ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylabel('macro-F1')
-    ax.set_xlabel('increasing distribution shift between what the encoder was fitted on '
-                  'and what it is scored on  \u2192', labelpad=2.0, fontsize=6.4, color=MUTED)
     ax.grid(axis='y'); ax.set_axisbelow(True)
     ax.legend(frameon=False, ncol=3, loc='lower left', bbox_to_anchor=(-0.025, 0.995),
               handlelength=1.1, columnspacing=0.8, handletextpad=0.4, fontsize=6.2)
