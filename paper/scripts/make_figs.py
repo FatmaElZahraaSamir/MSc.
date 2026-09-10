@@ -173,13 +173,17 @@ def fig_prior_shift():
     cx.set_title('(c) 8 prompted models, FR/NFR', fontsize=7.0, loc='left', pad=13)
 
     fig.savefig(OUT+'fig_prior_shift.pdf')
+    fig.savefig(OUT+'fig_prior_shift.png', dpi=300)
     
     plt.close(fig)
     print('fig_prior_shift.pdf  rho=%.3f  true_nfr=%.4f' % (rho, true_nfr))
 
 
 # ---------------------------------------------------------------- Figure 3
-# The inversion: encoder scores fall through the prompted band as shift grows.
+# The inversion. Panel (a) puts the prompted models on the same axis as the two
+# encoders -- one bar each, at every regime -- so the reader sees three
+# quantities being compared, not two lines against a shaded band. Panel (b)
+# counts the paired tests behind that picture.
 
 def fig_inversion():
     ev = pd.read_csv(Z+'results_Stage4_analysis/tab9_evaluability.csv')
@@ -191,47 +195,57 @@ def fig_inversion():
         return float(r.macro_f1.iloc[0]) if len(r) else np.nan
 
     regimes = ['in_domain', 'cross_project', 'cross_dataset']
+    labels = ['in-domain', 'cross-project', 'cross-dataset']
     prompted = sec[sec.eval_regime == 'prompted']
-    lo, hi = prompted.macro_f1.min(), prompted.macro_f1.max()
+    pmed = float(prompted.macro_f1.median())
+    plo, phi = float(prompted.macro_f1.min()), float(prompted.macro_f1.max())
 
-    fig, (ax, bx) = plt.subplots(2, 1, figsize=(9.45*CM, 7.1*CM),
-                                 gridspec_kw={'height_ratios': [1.5, 1.0], 'hspace': 0.60})
+    fig, (ax, bx) = plt.subplots(2, 1, figsize=(9.45*CM, 7.55*CM),
+                                 gridspec_kw={'height_ratios': [1.52, 1.0],
+                                              'hspace': 0.72})
 
-    ax.axhspan(lo, hi, color=C_LOC, alpha=0.17, zorder=0, lw=0)
-    ax.axhline(hi, color=C_LOC, lw=0.7, zorder=1)
-    ax.axhline(lo, color=C_LOC, lw=0.7, zorder=1)
-    ax.text(2.22, (lo+hi)/2, 'the eight\nprompted\nmodels',
-            fontsize=6.2, va='center', ha='left', color='#8a6100', linespacing=1.12)
-
-    for m, short, mk in [('BERT (weighted)', 'BERT', 'o'),
-                         ('RoBERTa (weighted)', 'RoBERTa', 's')]:
+    x = np.arange(3); w = 0.26
+    series = [('BERT (weighted)', 'BERT$_\\mathrm{w}$', C_ENC, None, -w),
+              ('RoBERTa (weighted)', 'RoBERTa$_\\mathrm{w}$', 'white', C_ENC, 0.0)]
+    base = {}
+    for m, lab, fc, ec, dx in series:
         ys = [f1(m, r) for r in regimes]
-        ax.plot(range(3), ys, '-', color=C_ENC, lw=1.2, marker=mk, ms=4.0,
-                mfc=C_ENC if mk == 'o' else 'white', mec=C_ENC, mew=1.0, zorder=3)
-        ax.annotate(short, (2, ys[-1]), xytext=(5, 0), textcoords='offset points',
-                    va='center', fontsize=6.3, color=INK)
-        up, down = (6, -11) if m.startswith('BERT') else (7, -10)
-        for i, v in enumerate(ys):
-            dy = (down if m.startswith('BERT') else up) if i == 2 else \
-                 (up if m.startswith('BERT') else down)
-            ax.annotate(f'{v:.3f}', (i, v), xytext=(0, dy), textcoords='offset points',
-                        ha='center', fontsize=6.0, color=INK2)
+        base[m] = ys[0]
+        b = ax.bar(x+dx, ys, w, color=fc, edgecolor=ec or 'white',
+                   linewidth=0.9 if ec else 0.7, label=lab, zorder=3)
+        for r_, v in zip(b, ys):
+            ax.annotate(f'{v:.3f}', (r_.get_x()+w/2, v), xytext=(0, 1.8),
+                        textcoords='offset points', ha='center', fontsize=5.9,
+                        color=INK)
+    # the prompted models: one bar (median of the eight), whisker = full range
+    b3 = ax.bar(x+w, [pmed]*3, w, color=C_LOC, edgecolor='white', linewidth=0.7,
+                hatch='/////', zorder=3, label='8 prompted LLMs (median)')
+    ax.errorbar(x+w, [pmed]*3, yerr=[[pmed-plo]*3, [phi-pmed]*3], fmt='none',
+                ecolor='#8a6100', elinewidth=0.7, capsize=1.8, capthick=0.7, zorder=4)
+    for i in range(3):
+        ax.annotate(f'{pmed:.3f}', (i+w, phi), xytext=(0, 3.0),
+                    textcoords='offset points', ha='center', fontsize=5.9,
+                    color='#8a6100')
 
-    ax.set_xticks(range(3))
-    ax.set_xticklabels(['in-domain', 'cross-project', 'cross-dataset'])
-    ax.set_xlim(-0.22, 3.22); ax.set_ylim(0.405, 1.005)
+    # the two losses the text quotes, marked on the bars they belong to
+    for m, dx, dy in [('BERT (weighted)', -w, 11)]:
+        for i, reg in [(1, 'cross_project'), (2, 'cross_dataset')]:
+            v = f1(m, reg); d = 100*(base[m]-v)/base[m]
+            ax.annotate(f'$-${d:.0f}%', (i+dx, v), xytext=(0, dy),
+                        textcoords='offset points', ha='center', fontsize=6.0,
+                        color='#8a2f2f')
+    ax.set_xticks(x); ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1.13); ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_ylabel('macro-F1')
+    ax.set_xlabel('increasing distribution shift between what the encoder was fitted on '
+                  'and what it is scored on  \u2192', labelpad=2.0, fontsize=6.4, color=MUTED)
     ax.grid(axis='y'); ax.set_axisbelow(True)
-    ax.set_title('(a) security classification, PROMISE_exp, identical test items',
-                 fontsize=7.2, loc='left', pad=4)
-    ax.annotate('', xy=(1.68, 0.432), xytext=(0.0, 0.432),
-                arrowprops=dict(arrowstyle='-|>', lw=0.6, color=MUTED,
-                                shrinkA=0, shrinkB=0, mutation_scale=6))
-    ax.text(0.84, 0.446, 'increasing distribution shift', fontsize=6.0,
-            ha='center', color=MUTED)
+    ax.legend(frameon=False, ncol=3, loc='lower left', bbox_to_anchor=(-0.025, 0.995),
+              handlelength=1.1, columnspacing=0.8, handletextpad=0.4, fontsize=6.2)
+    ax.set_title('(a) security classification, PROMISE_exp \u2014 the same 968 items '
+                 'scored in all three regimes', fontsize=7.0, loc='left', pad=15)
 
-    order = [('in_domain', 'in-domain'), ('cross_project', 'cross-project'),
-             ('cross_dataset', 'cross-dataset')]
+    order = list(zip(regimes, labels))
     ct = pd.crosstab(mc.encoder_regime, mc.verdict)
     y = np.arange(3)[::-1]
     left = np.zeros(3)
@@ -244,27 +258,30 @@ def fig_inversion():
         bx.barh(y, vals, left=left, height=0.60, color=col, edgecolor='white',
                 linewidth=1.0, hatch=hat, label=lab)
         for yy, v, l in zip(y, vals, left):
-            if v >= 10:
+            if v >= 6:
                 bx.text(l+v/2, yy, f'{int(v)}', ha='center', va='center',
                         fontsize=6.3, color=tc)
         left += vals
     bx.set_yticks(y); bx.set_yticklabels([lbl for _, lbl in order])
-    bx.set_xlabel('exact McNemar tests (Benjamini\u2013Hochberg, $\\alpha=0.05$)', labelpad=1.5)
-    bx.set_xlim(0, 118)
+    bx.set_xlabel('number of paired encoder-vs-LLM tests falling each way '
+                  '(exact McNemar, Benjamini\u2013Hochberg, $\\alpha=0.05$)',
+                  labelpad=1.5, fontsize=6.4)
+    bx.set_xlim(0, 122)
     for yy, (k, _) in zip(y, order):
-        bx.text(int(ct.loc[k].sum())+2.5, yy, f'n={int(ct.loc[k].sum())}',
+        bx.text(int(ct.loc[k].sum())+2.5, yy, f'{int(ct.loc[k].sum())} tests',
                 va='center', fontsize=6.0, color=MUTED)
     bx.spines['left'].set_visible(False)
     bx.tick_params(axis='y', length=0)
     bx.grid(axis='x'); bx.set_axisbelow(True)
     bx.legend(frameon=False, ncol=3, loc='lower left', bbox_to_anchor=(-0.02, 0.99),
               handlelength=1.2, columnspacing=1.0, handletextpad=0.45)
-    bx.set_title('(b) all 260 paired encoder-vs-LLM comparisons',
-                 fontsize=7.2, loc='left', pad=14)
+    bx.set_title('(b) every one of the 260 paired comparisons, grouped by regime',
+                 fontsize=7.0, loc='left', pad=14)
     fig.savefig(OUT+'fig_inversion.pdf')
-    
+    fig.savefig(OUT+'fig_inversion.png', dpi=300)
+
     plt.close(fig)
-    print('fig_inversion.pdf  prompted band %.3f-%.3f' % (lo, hi))
+    print('fig_inversion  prompted median %.3f  range %.3f-%.3f' % (pmed, plo, phi))
 
 
 # ---------------------------------------------------------------- Figure 4
@@ -354,6 +371,7 @@ def fig_cost():
     bx.set_title('(b) FR/NFR: cumulative cost against classified volume',
                  fontsize=7.2, loc='left', pad=4)
     fig.savefig(OUT+'fig_cost.pdf')
+    fig.savefig(OUT+'fig_cost.png', dpi=300)
     
     plt.close(fig)
     print('fig_cost.pdf  C0=%.4f cE=%.2e  breakeven %d-%d' %

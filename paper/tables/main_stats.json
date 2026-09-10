@@ -1,0 +1,32 @@
+{
+ "security_promise": {
+  "n_enc": 968,
+  "n_llm_min": 60,
+  "n_llm_max": 960
+ },
+ "security_secreq": {
+  "n_enc": 444,
+  "n_llm_min": 60,
+  "n_llm_max": 436
+ },
+ "fr_nfr_promise": {
+  "n_enc": 968,
+  "n_llm_min": 60,
+  "n_llm_max": 960
+ },
+ "subtype_top4_promise": {
+  "n_enc": 353,
+  "n_llm_min": 59,
+  "n_llm_max": 341
+ },
+ "subtype_top6_promise": {
+  "n_enc": 433,
+  "n_llm_min": 141,
+  "n_llm_max": 415
+ },
+ "subtype_all_promise": {
+  "n_enc": 524,
+  "n_llm_min": 491,
+  "n_llm_max": 491
+ }
+}

@@ -1,8 +1,8 @@
-# Paper — *Fine-Tuned Encoders or Prompted LLMs for Requirements Classification? The Verdict Inverts Under Distribution Shift*
+# Paper — *Large Language Models for Software Requirements Classification: Cross-Dataset Generalization and Cost-Efficiency*
 
-An 8-page IEEE conference paper (7 pages of content, page 8 references) built
-directly from the seven-stage pipeline in the repository root. Every number in
-the paper is read back from a stored artefact; nothing is transcribed by hand.
+An IEEE-format conference paper built directly from the seven-stage pipeline in
+the repository root. Every number in the paper is read back from a stored
+artefact; nothing is transcribed by hand.
 
 ## Build
 
@@ -19,12 +19,15 @@ Requires `IEEEtran`, `booktabs`, `tikz`, `pifont`, `balance`, `microtype`
 |---|---|
 | `main.tex` | the paper; the only hand-written file |
 | `figures/fig_architecture.tex` | Fig. 1, the system-architecture diagram, pure TikZ |
-| `figures/fig_inversion.pdf` | Fig. 3, the regime inversion (slopegraph + verdict bars) |
+| `figures/fig_inversion.pdf` | Fig. 3, the regime reversal (grouped bars incl. the prompted models + verdict bars) |
 | `figures/fig_prior_shift.pdf` | Fig. 4, the shared failure mode (three panels) |
 | `figures/fig_cost.pdf` | Fig. 5, Pareto frontier and break-even |
-| `tables/*.tex` | generated `tabular` bodies, `\input` at table-body level |
+| `tables/tab_main.tex` | the single results table: 12 configurations × 6 cells × every regime |
+| `tables/tab_loss.tex` | encoder relative loss under shift |
+| `tables/tab_prompt.tex` | phrasing sub-study, incl. the best-of-three oracle gain |
+| `tables/tab_cost.tex` | cost and latency by access tier, with the pricing basis |
 | `scripts/make_figs.py` | regenerates the three data figures |
-| `scripts/make_tables.py` | regenerates the numeric table bodies (`tab_cost.tex` is produced but the paper folds that table into prose) |
+| `scripts/make_tables.py` | regenerates the numeric table bodies and the `*_stats.json` files the prose quotes |
 
 Fig. 2 (the prompt template) is set inline in `main.tex`.
 
@@ -42,7 +45,8 @@ artefacts/
                                    predictions_subtype_repaired.parquet
 ```
 
-Unzip the `results *.zip` archives in the repository root into that directory, then:
+Unzip the `results *.zip` archives in the repository root into that directory
+(`paper/artefacts/`, or a symlink to it), then:
 
 ```bash
 cd scripts && python3 make_tables.py && python3 make_figs.py

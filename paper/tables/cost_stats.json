@@ -5,8 +5,12 @@
  "be_pairs": 276,
  "be_all": 276,
  "enc_med": 0.0024,
- "pr_min": 0.0216,
- "pr_max": 0.1132,
- "pr_med": 0.0439,
- "train_med": 0.0093
+ "pr_min": 0.02475,
+ "pr_max": 0.0704,
+ "pr_med": 0.04455,
+ "ratio_min": 10.312500000000002,
+ "ratio_max": 29.33333333333334,
+ "ratio_med": 18.5625,
+ "train_med": 0.0093,
+ "size_cost_rho": 0.8493254095435151
 }

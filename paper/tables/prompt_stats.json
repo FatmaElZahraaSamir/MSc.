@@ -1,0 +1,12 @@
+{
+ "n_cells": 9,
+ "gain_med": 0.0031999999999999806,
+ "gain_max": 0.03590000000000004,
+ "gain_mean": 0.009855555555555569,
+ "spread_med": 0.0439,
+ "spread_max": 0.4846,
+ "n_terse_collapse": 3,
+ "spread_med_excl": 0.03135,
+ "spread_max_excl": 0.0594,
+ "n_base_best": 3
+}

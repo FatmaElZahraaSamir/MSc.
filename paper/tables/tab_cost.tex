@@ -1,12 +1,13 @@
-\setlength{\tabcolsep}{3.4pt}
-\renewcommand{\arraystretch}{1.06}
-\begin{tabular}{@{}lcccc@{}}
+\setlength{\tabcolsep}{2.0pt}
+\renewcommand{\arraystretch}{1.05}
+\scriptsize
+\begin{tabular}{@{}lcccccc@{}}
 \toprule
-\textbf{Tier} & \textbf{Models} & \textbf{USD/1k} & \textbf{Latency (s)} & \textbf{Training} \\
+\textbf{Tier} & \textbf{Mod.} & \textbf{B} & \textbf{Basis} & \textbf{USD/1k} & \textbf{Latency (s)} & \textbf{Train} \\
 \midrule
-Fine-tuned encoder & 4 & 0.0024--0.0024 & 0.016--0.016 & 0.0093 \\
-Open-weight, local (4-bit) & 6 & 0.0312--0.0522 & 0.194--0.356 & -- \\
-Open-weight, hosted API & 1 & 0.0704--0.0704 & 0.095--0.095 & -- \\
-Commercial API & 1 & 0.0248--0.0248 & 0.614--0.614 & -- \\
+Fine-tuned encoder & 4 & 0.11--0.12 & GPU time & 0.0024 & 0.016 & 0.0093 \\
+Open-weight, local & 6 & 2.61--8.03 & GPU time & 0.0312--0.0522 & 0.194--0.356 & -- \\
+Open-weight, hosted & 1 & 70.60 & tokens & 0.0704 & 0.095 & -- \\
+Commercial API & 1 & n/a & tokens & 0.0248 & 0.614 & -- \\
 \bottomrule
 \end{tabular}

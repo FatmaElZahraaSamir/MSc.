@@ -1,6 +1,6 @@
 %% ===========================================================================
-%%  Fine-Tuned Encoders or Prompted LLMs for Requirements Classification?
-%%  The Verdict Inverts Under Distribution Shift
+%%  Large Language Models for Software Requirements Classification:
+%%  Cross-Dataset Generalization and Cost-Efficiency
 %%
 %%  IEEE conference format, 8 pages (7 + references).
 %%  All reported numbers are read from the pipeline artefacts in ../ ; the
@@ -29,6 +29,10 @@
 
 \newcommand{\pex}{PROMISE\_exp}
 \newcommand{\Fm}{macro-F1}
+% Regime abbreviations used as column heads in Table IV.
+\newcommand{\ID}{\textsc{id}}
+\newcommand{\XP}{\textsc{xp}}
+\newcommand{\XD}{\textsc{xd}}
 \definecolor{encblue}{HTML}{0072B2}
 \definecolor{llmgold}{HTML}{E69F00}
 \definecolor{panel}{HTML}{F2F4F7}
@@ -47,8 +51,8 @@
 
 \begin{document}
 
-\title{Fine-Tuned Encoders or Prompted LLMs for\\Requirements Classification?
-       The Verdict Inverts Under Distribution Shift}
+\title{Large Language Models for Software Requirements\\Classification:
+       Cross-Dataset Generalization and Cost-Efficiency}
 
 \author{\IEEEauthorblockN{Fatma El-Zahraa Samir, Khaled T. Wassif, and Lamia AbouZeid}
 \IEEEauthorblockA{\textit{Faculty of Computers and Artificial Intelligence},
@@ -58,27 +62,32 @@ fatmaelzahraasamirabdelfattah@gmail.com}}
 \maketitle
 
 \begin{abstract}
-Recent studies report that prompted large language models (LLMs) match or beat
-fine-tuned transformers on software requirements classification, and conclude
-that the task is close to solved. We show that this conclusion is an artefact of
-\emph{how} the field evaluates. Twelve configurations---four fine-tuned encoder
-variants and eight prompted LLMs spanning 4-bit open-weight models on a free-tier
-GPU, a hosted 70\,B model and a commercial API---classify 1{,}412 de-duplicated
-requirements from \pex{} and SecReq across three tasks and three evaluation
-regimes of increasing distribution shift: in-domain, cross-project and
-cross-dataset. All 76{,}115 predictions are scored under one strict rule; every
-encoder--LLM comparison is McNemar-paired on identical items and corrected across
-a single 260-test family. In-domain the encoders win 67 of 106 tests and lose
-none. Under cross-dataset transfer the verdict inverts: prompted models win 48 of
-64, and the best in-domain encoder loses 42.8\% of its \Fm{}. The cause is not
-unfamiliar vocabulary but an uncalibrated class prior---and both model families
-have it. The transferred encoder labels 44.2\% of items \textit{security}
-against a true prevalence of 12.9\%, reproducing its training corpus's 39.9\%
-prior; the prompted models' FR/NFR accuracy ranks with how badly they mis-set the
-same prior ($\rho = 0.95$), and merely re-wording the question moves it by up to
-0.485 \Fm{}. Encoders nevertheless stay 9--47$\times$ cheaper and repay their
-training within 46--552 items. Fine-tune for a stable labelled domain; prompt
-when the distribution moves.
+Several recent studies report that prompted large language models (LLMs) match
+or exceed fine-tuned transformer baselines on software requirements
+classification, and some of them conclude that labelled training data is no
+longer needed for the task. Those results are almost always obtained
+in-distribution, with training data or few-shot exemplars drawn from the same
+corpus that supplies the test items, and they rarely report what the technique
+costs to run. This paper re-examines the comparison after repairing both
+omissions. Fine-tuned encoders and prompted LLMs of three access tiers classify
+the same requirements from two public corpora, under the same tasks and the same
+scoring rule, at three levels of distribution shift: within one corpus, across
+held-out projects, and across an independently annotated corpus. Every
+encoder--LLM comparison is paired on identical items and corrected for
+multiplicity as one test family, and inference cost is measured per model from
+the same runs that produced the predictions. The ranking of the two approaches
+is not stable across those levels. Within a corpus the fine-tuned encoders are
+ahead and are never significantly beaten; once the test corpus is annotated by
+someone else the ordering reverses and the prompted models are ahead in most
+comparisons. The reason is not that the transferred encoder fails to recognise
+the vocabulary of the new corpus but that it carries the class balance of the
+corpus it was trained on, and the prompted models turn out to have the same
+weakness for a different reason: their class balance is set by the wording of
+the instruction, and changing that wording moves it. Encoders remain an order of
+magnitude cheaper per item and recover their one-off training cost within a few
+hundred classifications. The practical implication is that the evaluation regime
+belongs in the claim: a result obtained in-distribution does not predict the
+ranking under a change of corpus, and can reverse it.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -90,136 +99,141 @@ distribution shift, empirical software engineering, cost-efficiency
 \section{Introduction}
 %% ===========================================================================
 
-Requirements classification---assigning natural-language requirement statements
-to categories such as functional (FR) versus non-functional (NFR), or
-security-relevant versus not---is among the earliest analytical tasks in
-requirements engineering (RE). Getting it right supports early risk
-identification and architectural choice; getting it wrong propagates downstream
-as rework~\cite{clelandhuang2007}. Two decades of automation have moved the task
-from weighted indicator terms~\cite{clelandhuang2007}, through supervised
-learning on engineered features~\cite{kurtanovic2017,dalpiaz2019}, to fine-tuned
+Requirements classification assigns natural-language requirement statements to
+categories such as functional (FR) versus non-functional (NFR), or
+security-relevant versus not. ISO/IEC/IEEE 29148 defines requirements and their
+attributes for the whole life cycle~\cite{iso29148}, and classification is one
+of the first analytical steps performed once requirements have been elicited.
+Getting it right supports early risk identification and architectural choice;
+getting it wrong propagates downstream as rework~\cite{clelandhuang2007}. Two
+decades of automation have moved the task from weighted indicator
+terms~\cite{clelandhuang2007}, through supervised learning on engineered
+features~\cite{kurtanovic2017,dalpiaz2019}, to fine-tuned
 transformers~\cite{hey2020norbert} and, since 2024, to prompted generative
-LLMs~\cite{elhajjami2024,binkhonain2025,alhoshan2025,tang2025,levy2026}.
+LLMs~\cite{elhajjami2024,binkhonain2025,alhoshan2025,tang2025,levy2026}. A
+systematic mapping of AI techniques applied to the task documents the same
+progression and the datasets it has relied on~\cite{kaur2024}.
 
-The field's current headline is that the task is essentially solved. Fine-tuned
-encoders, commercial LLMs and even well-prompted small open models all report
-\Fm{} and accuracy in the high eighties to mid
-nineties~\cite{hey2020norbert,binkhonain2025,tang2025,vasudevan2026,levy2026}.
-Several studies conclude that prompting can replace supervision outright,
-removing the need for annotated data~\cite{binkhonain2025,tang2025}.
+It is worth being precise about what this recent work claims. No study we are
+aware of states that requirements classification is solved. What several studies
+report is parity or better between prompting and supervision on the corpora they
+use: Binkhonain and Alfayaz find that few-shot prompting matches or exceeds a
+fine-tuned transformer and conclude that prompting is a viable alternative where
+labelled data is scarce~\cite{binkhonain2025}; Tang et al.\ report an 8\,B open
+model passing a fine-tuned baseline on PROMISE~\cite{tang2025}; and Alhoshan et
+al.\ report that generative models perform the task competitively without
+task-specific training~\cite{alhoshan2025}, extending earlier evidence that
+zero-shot embedding methods already made labelled data non-essential in some
+settings~\cite{alhoshan2023}. Together these results make ``prompting can
+replace fine-tuning'' a reasonable reading of the state of the art, and it is
+that reading, rather than any individual paper's claim, that this study tests.
 
-That conclusion rests on a measurement convention. Almost every published result
-is \emph{in-distribution}: the model is tuned, or its few-shot exemplars
-selected, on the same corpus it is then scored on. Where prior work claims
-improved ``generalisability'' it usually means transfer across \emph{tasks} on
-the same two corpora, not across unseen projects or an independent
-dataset~\cite{binkhonain2025}---precisely the property the field's own
-foundational baseline warned was fragile, since NoRBERT was motivated by
-classifiers over-fitting project-specific wording~\cite{hey2020norbert}. A second
-omission compounds the first: inference cost, latency and model size are seldom
-quantified at all, though they decide whether a technique is adoptable without a
-commercial API budget.
+The reading rests on a measurement convention. Almost every published result is
+obtained in-distribution: the model is fine-tuned, or its few-shot exemplars are
+selected, on the same corpus that then supplies the test items. Where prior work
+reports improved generalisability, it usually means transfer across \emph{tasks}
+on the same corpora rather than to unseen projects or an independently produced
+dataset~\cite{binkhonain2025}---the property the field's own transfer-learning
+baseline warned about, since NoRBERT was motivated by classifiers over-fitting
+project-specific wording~\cite{hey2020norbert}. A second omission compounds the
+first: inference cost, latency and model size are seldom quantified, although
+they decide whether a technique can be adopted without a commercial API budget.
 
-This paper asks what happens to the published ranking when those two omissions
-are repaired. We hold the corpus, the items, the label sets and the scoring rule
-fixed, and vary only the amount of distribution shift between what a model was
-tuned on and what it is scored on. Concretely, we contribute:
+This paper asks what happens to the comparison when both omissions are repaired.
+We hold the corpus, the items, the label sets and the scoring rule fixed, and
+vary only the distribution shift between what a model was fitted on and what it
+is scored on. Our contributions are:
 
 \begin{enumerate}
 \item \textbf{A paired, multiplicity-controlled benchmark} of twelve
 configurations---four fine-tuned encoder variants and eight prompted LLMs across
-local, hosted and commercial tiers---over three tasks, two corpora and three
-regimes: 76{,}115 predictions scored once under one strict protocol, with 260
-exact McNemar tests corrected as a single family (Sections~\ref{sec:design}
-and~\ref{sec:results}).
-\item \textbf{The inversion result.} In-domain the encoders are never
-significantly beaten (67 wins, 39 ties, 0 losses). Under cross-dataset transfer
-the same comparisons reverse (3 wins, 13 ties, 48 losses), with the strongest
-in-domain encoder losing 42.8\% of its \Fm{}. The ranking a benchmark reports is
-a property of the regime it evaluates, not of the models
-(Section~\ref{sec:rq2}).
-\item \textbf{A mechanism, not just a gap.} The collapse is consistent with
-base-rate shift rather than lexical novelty---the transferred encoder reproduces
-the prior of its \emph{training} corpus, so precision collapses while recall
-holds---and the prompted models prove to have the same defect from a different
-source: their FR/NFR accuracy ranks with how badly they mis-set the prior
-($\rho = 0.95$), and re-wording the question moves it
+local, hosted and commercial access tiers---over three tasks, two corpora and
+three evaluation regimes, scored once under one strict protocol, with all
+encoder--LLM tests corrected as a single family
+(Sections~\ref{sec:design} and~\ref{sec:results}).
+\item \textbf{Evidence that the ranking depends on the regime.} Within a corpus
+the encoders are ahead and are never significantly beaten; across corpora the
+same comparisons reverse (Section~\ref{sec:rq2}).
+\item \textbf{A diagnosis rather than a gap.} The collapse under corpus change is
+consistent with a shift in class balance rather than with unfamiliar vocabulary,
+and the prompted models have the same defect from another source: their
+predicted class balance is set by the wording of the instruction
 (Sections~\ref{sec:rq2} and~\ref{sec:prior}).
-\item \textbf{An explicit accuracy--cost frontier.} Encoders cost
-\$0.0024 per 1{,}000 classifications against \$0.0216--\$0.1132 for prompted
-alternatives, and repay their one-off fine-tuning within 46--552 classifications
-in all 276 measured pairings---which is what makes the transfer finding a real
-trade-off rather than a verdict (Section~\ref{sec:rq3}).
+\item \textbf{A measured accuracy--cost comparison}, with the price of each
+configuration derived from the same runs that produced its predictions, and the
+compute-priced and token-priced tiers reported separately
+(Section~\ref{sec:rq3}).
 \end{enumerate}
 
 Three research questions organise the study. \textbf{RQ1}: how do open and
-commercial LLMs compare with fine-tuned encoders in-domain? \textbf{RQ2}: how
-much performance is lost under cross-project and cross-dataset evaluation, and
-does the loss differ by model class? \textbf{RQ3}: what is the
-accuracy-versus-cost trade-off, and what is the cheapest freely available option
-that is good enough?
+commercial LLMs compare with fine-tuned encoders when both are evaluated within
+one corpus? \textbf{RQ2}: how much performance is lost under cross-project and
+cross-dataset evaluation, and does the loss differ between the two model
+families? \textbf{RQ3}: what is the accuracy-versus-cost trade-off, and what is
+the cheapest freely available option that is good enough?
 
 %% ===========================================================================
 \section{Related Work and the Evaluation Gap}
 %% ===========================================================================
 
 \subsection{From indicator terms to prompting}
-Automated requirements classification has passed through four overlapping waves.
-Rule-based work established the task and produced the PROMISE NFR
-collection~\cite{clelandhuang2007}; classical supervised learning followed, with
+Automated requirements classification has passed through four overlapping
+phases. Rule-based work established the task and produced the PROMISE NFR
+collection~\cite{clelandhuang2007}. Classical supervised learning followed, with
 SVMs separating FRs from NFRs~\cite{kurtanovic2017} and interpretable variants
 combining dependency parsing with feature attribution~\cite{dalpiaz2019}; deep
-models removed much of the feature engineering but demanded more
+models removed much of the feature engineering but needed more
 data~\cite{sonawane2024}. Transfer learning then reset the state of the art:
-NoRBERT fine-tunes BERT and reaches \Fm{} in the mid
-nineties~\cite{hey2020norbert}, a pattern a systematic mapping later
-confirmed~\cite{kaur2024}. Zero-shot sentence-embedding methods showed labelled
-data was not strictly necessary~\cite{alhoshan2023}, and prompted generative LLMs
-now dominate.
+NoRBERT fine-tunes BERT and reports \Fm{} in the mid nineties on the PROMISE
+categories~\cite{hey2020norbert}, a pattern the systematic mapping of Kaur and
+Kaur later confirmed across the published literature~\cite{kaur2024}. Zero-shot
+sentence-embedding methods then showed that labelled data was not strictly
+necessary~\cite{alhoshan2023}, and prompted generative LLMs now dominate recent
+work.
 
 \subsection{Recent LLM studies (2024--2026)}
 El-Hajjami et al.~\cite{elhajjami2024} compared SVM and LSTM against GPT-3.5 and
 GPT-4 over five datasets and found no single best technique; Peer et
 al.~\cite{peer2024} embedded LLM classification in a model-based systems
 engineering workflow. Binkhonain and Alfayaz~\cite{binkhonain2025} report the
-study closest to ours: five LLMs under four prompting strategies over three tasks
-on PROMISE and SecReq, benchmarked against a fine-tuned transformer that few-shot
-prompting matches or exceeds. Alhoshan et al.~\cite{alhoshan2025} ran more than
-400 experiments over three open generative models, and Tang et
-al.~\cite{tang2025} identified an ``over-prompting'' effect in which extra
+study closest to ours: five LLMs under four prompting strategies over three
+tasks on PROMISE and SecReq, benchmarked against a fine-tuned transformer that
+few-shot prompting matches or exceeds. Alhoshan et al.~\cite{alhoshan2025} ran
+more than 400 experiments over three open generative models, and Tang et
+al.~\cite{tang2025} identified an over-prompting effect in which additional
 in-context examples degrade accuracy on PROMISE and PURE~\cite{ferrari2017pure},
-letting a TF--IDF exemplar selector push an 8\,B open model past the fine-tuned
-baseline. Chaudhary et
-al.~\cite{chaudhary2025} extended the task to noisy app-store reviews, Vasudevan
-et al.~\cite{vasudevan2026} compared fine-tuned BERT and RoBERTa against GPT-4o,
-and Levy et al.~\cite{levy2026} benchmarked three current models against expert
-judgment on \pex{}.
+while a TF--IDF exemplar selector pushes an 8\,B open model past the fine-tuned
+baseline. Chaudhary et al.~\cite{chaudhary2025} extended the task to noisy
+app-store reviews, Vasudevan et al.~\cite{vasudevan2026} compared fine-tuned
+BERT and RoBERTa against GPT-4o, and Levy et al.~\cite{levy2026} benchmarked
+three current models against expert judgment on \pex{}.
 
-\subsection{What the field does not measure}
+\subsection{What this literature does not measure}
 \label{sec:gap}
 Table~\ref{tab:coverage} summarises the evaluation coverage of these studies
-along the axes that matter for adoption. Three patterns are near-universal.
+along the axes that matter for adoption, and three patterns recur.
 \emph{First}, evaluation is in-distribution: the same corpus supplies the
 training data or the few-shot exemplars and the test items. Only the app-review
-study~\cite{chaudhary2025} tests genuinely different text, and it records
-markedly lower precision on several categories---an unexplained signal that the
-field has not followed up. \emph{Second}, cost is not a reported dimension; work
-that does use open models focuses on predictive performance
-alone~\cite{alhoshan2025,tang2025}. \emph{Third}, the same two or three small,
-ageing, public corpora underlie nearly every result, so contamination of LLM
-pre-training data is a live threat that is acknowledged but never
+study~\cite{chaudhary2025} tests genuinely different text, and it reports
+markedly lower precision on several categories---a signal the literature has not
+followed up. \emph{Second}, cost is not a reported dimension, even in the
+studies that use open models~\cite{alhoshan2025,tang2025}. \emph{Third}, the
+same two or three small, ageing, public corpora underlie nearly every result, so
+contamination of LLM pre-training data is a threat that is acknowledged but not
 addressed~\cite{sainz2023}.
 
-These gaps are not independent. If in-distribution parity is what motivates
-replacing supervision with prompting, and is also exactly what contamination and
-corpus reuse would produce spuriously, then the comparison that settles the
-question has not yet been run. This paper runs it.
+These gaps interact. If in-distribution parity is what motivates replacing
+supervision with prompting, and is also what corpus reuse and contamination
+would produce spuriously, then the comparison that would settle the question has
+not been run. This study runs it: the same models, items and scoring rule,
+evaluated at three levels of distribution shift, with inference cost measured
+alongside accuracy.
 
 \begin{table}[t]
 \caption{Evaluation coverage of recent LLM-based requirements-classification
-studies. \cmark{}\,= reported; \xmark{}\,= not reported. ``Cross-project'' means
-held-out unseen projects; ``cross-dataset'' means an independently produced
-corpus.}
+studies. \cmark{}\,= reported; \xmark{}\,= not reported; $\sim$\,= partially
+reported. ``Cross-project'' means held-out unseen projects; ``cross-dataset''
+means an independently produced corpus.}
 \label{tab:coverage}
 \centering
 \footnotesize
@@ -238,8 +252,6 @@ Tang et al.~\cite{tang2025}              & \cmark & \cmark & \xmark & \xmark & \
 Chaudhary et al.~\cite{chaudhary2025}    & \xmark & \cmark & \xmark & $\sim$ & \xmark \\
 Vasudevan et al.~\cite{vasudevan2026}    & \xmark & \cmark & \xmark & \xmark & \xmark \\
 Levy et al.~\cite{levy2026}              & \cmark & \cmark & \xmark & \xmark & \xmark \\
-\midrule
-\textbf{This paper}                      & \cmark & \cmark & \cmark & \cmark & \cmark \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -250,36 +262,55 @@ Levy et al.~\cite{levy2026}              & \cmark & \cmark & \xmark & \xmark & \
 %% ===========================================================================
 
 The study is a controlled benchmark. Twelve model configurations classify the
-same requirements, under the same tasks, against the same frozen splits, and are
-scored by one strict rule, so that every comparison we report is paired on
-identical items. Fig.~\ref{fig:arch} shows the design: a single data and scoring
-spine, two model arms that differ only in whether they consume training data,
-and three evaluation regimes of increasing distribution shift. The pipeline runs
-as seven stages, each writing a content-hashed artefact that the next stage
-consumes; every number in Section~\ref{sec:results} is read back from those
-artefacts.
+same requirements, under the same tasks, against the same frozen splits, scored
+by one rule, so every comparison we report is paired on identical items.
+Fig.~\ref{fig:arch} shows the design: one data and scoring path shared by both
+model families, and three evaluation regimes of increasing distribution shift.
+The pipeline runs as seven stages, each writing a content-hashed artefact that
+the next consumes; every number in Section~\ref{sec:results} is read back from
+those artefacts by the scripts that typeset the tables and figures.
 
 \input{figures/fig_architecture}
 
-\subsection{Corpus}
-Two public corpora are merged (Table~\ref{tab:corpus}). \pex{}~\cite{lima2019}
-contributes 969 requirements from 47 projects, SecReq~\cite{knauss2011} 510 from
-three industrial security specifications. Texts are normalised and exact
-duplicates removed---67 rows, none shared between corpora---leaving 1{,}412
-requirements in 50 project groups. Splits are generated once with seed 42 and
-keyed by identifiers pinned to the SHA-256 hash of each source file; because
-grouped-fold membership depends on the library version that produced
-it~\cite{pedregosa2011}, the split file is consumed, never regenerated.
+\subsection{Data preparation}
+\label{sec:data}
+Two public corpora are used. \pex{}~\cite{lima2019}, an expanded release of the
+PROMISE NFR collection, contributes 969 requirements from 47 projects, each
+labelled FR or NFR and, when NFR, with one of eleven quality sub-types.
+SecReq~\cite{knauss2011} contributes 510 sentences from three industrial
+security specifications, each labelled security-relevant or not.
 
-The decisive property of this pair is a base-rate contrast: security requirements
-are 12.9\% of \pex{} but 39.9\% of SecReq---a three-fold difference in
-prevalence for a concept both corpora annotate independently. That contrast, not
-vocabulary, drives the main result.
+Preparation proceeds in four steps, implemented once in the first pipeline
+stage. \emph{(i)~Normalisation:} texts are whitespace- and encoding-normalised,
+and label strings are mapped onto one controlled vocabulary so that the two
+corpora express the security concept identically. \emph{(ii)~De-duplication:}
+exact duplicate texts are removed---67 rows, all of them within a corpus rather
+than across the two---leaving 1{,}412 requirements in 50 project groups
+(Table~\ref{tab:corpus}). \emph{(iii)~Split generation:} the fourteen split
+families used by the three regimes are generated once with seed 42 and stored,
+keyed by requirement identifiers pinned to the SHA-256 hash of each source file.
+Because grouped-fold membership depends on the library version that produced
+it~\cite{pedregosa2011}, the split file is consumed by later stages and never
+regenerated. \emph{(iv)~Frame construction:} each task defines the set of items
+it is evaluated on, as described below.
+
+Two properties of the result matter for the rest of the paper. The first is a
+difference in class balance: security requirements are 12.9\% of \pex{} but
+39.9\% of SecReq, a roughly threefold difference in prevalence for a concept
+both corpora annotate independently, and the cross-dataset regime is built on
+that contrast. The second is that the security label reaches the two corpora by
+different routes. In \pex{} it is derived from the security sub-class of the NFR
+taxonomy, so every \pex{} item labelled security is also labelled NFR and none
+of the 444 FRs is labelled security; in SecReq it is applied to any
+security-relevant sentence, with no FR/NFR annotation at all. The cross-dataset
+regime therefore carries a definitional shift alongside the distributional one,
+and we return to this in the threats to validity.
 
 \begin{table}[t]
-\caption{Corpus construction. Prevalence is the share of items in the positive
-class of the security task; the three-fold contrast between the two corpora is
-what the cross-dataset arm exploits.}
+\caption{Corpus construction. ``Sec.\ prev.'' is the share of items labelled
+\textit{security}; the threefold difference between the two corpora is what the
+cross-dataset regime exploits. Counts are read from the stored corpus file, not
+transcribed from the source papers.}
 \label{tab:corpus}
 \centering
 \footnotesize
@@ -296,59 +327,103 @@ Unified                 & 1{,}479 & 1{,}412 & 50 & 444 / 524 & 21.4\% \\
 \end{tabular}
 \end{table}
 
-\subsection{Tasks}
-Three task families are defined over the unified corpus. \emph{Binary FR/NFR}
-uses the native \pex{} labels. \emph{Binary security} is native in SecReq and
-derived in \pex{} from the \textsc{se} sub-class, giving the same task on two
-independently produced corpora---the property the cross-dataset arm exploits.
-\emph{NFR sub-type} classification uses the eleven-class taxonomy of
-Cleland-Huang et al.~\cite{clelandhuang2007}, which aligns with the ISO/IEC
-25010 quality characteristics~\cite{iso25010}; because several tail classes have
-single-digit support, reduced top-6 and top-4 variants are also evaluated (524,
-433 and 353 items). \Fm{}
-is always computed over the \emph{full declared label set} of the variant, so a
-model is penalised for every class it never predicts.
+\subsection{Tasks, label sets, and why they are not staged}
+\label{sec:tasks}
+Three task families are defined over the unified corpus.
+\emph{Binary FR/NFR} uses the native \pex{} labels over all 968 \pex{} items.
+\emph{Binary security} is native in SecReq and derived in \pex{} from the
+security sub-class, which gives the same task on two independently produced
+corpora. \emph{NFR sub-type} classification uses the eleven-class taxonomy of
+Cleland-Huang et al.~\cite{clelandhuang2007}, whose categories align with the
+ISO/IEC 25010 quality characteristics~\cite{iso25010}.
+
+The three tasks are evaluated independently. There is no cascade: the security
+classifier is not shown the output of the FR/NFR classifier, and every item is
+presented to it directly, including the 444 \pex{} items labelled FR. We state
+this because the \pex{} \emph{annotation} is hierarchical---security is a
+sub-class of NFR---so it would be easy to assume the \emph{pipeline} is
+hierarchical too. It is not, and deliberately so: a staged design would make the
+security score depend on the FR/NFR classifier's errors, and would have no
+counterpart in SecReq, where no FR/NFR labels exist. Keeping the tasks flat is
+what makes the security task comparable across the two corpora.
+
+Several sub-type classes have single-digit support in \pex{}, so the sub-type
+task is evaluated at three granularities: the full eleven classes (524 items),
+the six most frequent (433) and the four most frequent (353). For a fine-tuned
+encoder the label set determines the size of the classification head and the
+model is re-trained for each granularity. For a prompted model there is no head
+to resize and no training at all, so it is fair to ask what top-4 and top-6
+mean. They change three things. The candidate labels are enumerated inside the
+prompt itself, so at top-4 the model is offered four labels and at all-11
+eleven. The evaluation frame changes: an item enters the top-4 frame only if its
+true label is one of those four. And \Fm{} is computed over the full declared
+label set of the variant, so a model is penalised for every declared class it
+never predicts, and that denominator grows with granularity. Granularity is a
+property of the question and of the scoring rather than of the model weights,
+and it is therefore measurable for prompted and fine-tuned models alike.
 
 \subsection{Evaluation regimes}
-Fourteen frozen split families (107 folds) implement three regimes of increasing
-shift. \textbf{In-domain} is stratified 5-fold cross-validation within one
-corpus---the in-distribution reference arm prior work reports.
-\textbf{Cross-project} uses grouped folds holding out entire unseen project
-groups, plus a leave-one-project-out arm over the 47 \pex{} projects.
-\textbf{Cross-dataset} trains on the security task of one corpus and tests on the
-other (\pex{}~$\leftrightarrow$~SecReq): identical label sets, different
-annotation provenance.
+Fourteen frozen split families, comprising 107 folds, implement three regimes of
+increasing distribution shift.
+\textbf{In-domain} is stratified 5-fold cross-validation within one corpus. This
+is the in-distribution setting that prior work reports.
+\textbf{Cross-project} uses grouped folds that hold out entire unseen project
+groups, plus a leave-one-project-out variant over the 47 \pex{} projects.
+\textbf{Cross-dataset} fits on the security task of one corpus and tests on the
+other, in both directions: identical label sets, different annotation
+provenance.
 
-The asymmetry between the two model arms is the analytical lever. Encoders are
-re-trained at every station on that station's training folds. Prompted models
-have no training distribution, so their scores are regime-invariant by
-construction: they form a fixed reference line against which the encoders' drop
-is measured. Every requirement is a test item exactly once within each encoder
-family, so the encoders' stored predictions cover the corpus; the prompted models
-answer stratified samples of that same corpus---300 items per binary cell and 200
-per sub-type cell, allocated in proportion to the class prior with a floor of ten
-per class, and the six local models additionally answer the full evaluation
-frames. Every encoder--LLM comparison is therefore paired on identical
-requirements, aligned by requirement identifier rather than by position.
+The asymmetry between the two model families is the analytical lever. Encoders
+are re-fitted at every regime on that regime's training folds; prompted models
+have no training distribution, so their scores cannot change with the regime,
+which is why the same score appears in every regime column of
+Table~\ref{tab:main}. Every requirement is a test item exactly once within each
+encoder family, so the encoders' stored predictions cover the corpus. The
+prompted models answer stratified samples of the same items---300 per binary
+cell and 200 per sub-type cell, allocated in proportion to the class prior with
+a floor of ten per class---and the six local models additionally answer the full
+evaluation frames. Every encoder--LLM comparison is paired on identical
+requirements, aligned by identifier rather than by position.
 
-\subsection{Model configurations}
-Table~\ref{tab:models} lists the twelve configurations. The encoder tier
-fine-tunes \texttt{bert-base-uncased}~\cite{devlin2019} and
+\subsection{The two model families, and why they are compared}
+\label{sec:families}
+Table~\ref{tab:models} lists the twelve configurations. The comparison is
+between two architectures, and the difference is not incidental to the question.
+
+A fine-tuned encoder is a bidirectional, encoder-only transformer pre-trained
+with masked language modelling and then adapted by supervised training of a
+classification head over the pooled sentence representation. Both the decision
+boundary and the class prior are learned from the labelled training folds. A
+prompted LLM is a decoder-only autoregressive model that has not been adapted to
+the task at all: it receives the label vocabulary as text, produces the answer
+as generated tokens, and its implicit class prior comes from pre-training and
+from the instruction rather than from any corpus of requirements.
+
+That contrast is what makes the comparison informative, because the two families
+should respond differently to distribution shift precisely by acquiring their
+class prior from different places---and Section~\ref{sec:prior} shows that they
+do. Prior work has argued that architectural choice affects requirements
+classification results~\cite{vasudevan2026}, so we treat architecture as a
+declared property rather than a nuisance variable: Table~\ref{tab:models}
+records the family, parameter count and access tier of every model, and all
+results are reported per configuration.
+
+We fine-tune \texttt{bert-base-uncased}~\cite{devlin2019} and
 \texttt{roberta-base}~\cite{liu2019} with a classification head (AdamW,
 lr $2\times10^{-5}$, batch 16, max length 128, linear decay without warmup, full
 precision; 3 epochs on the binary tasks, 10 on the sub-types), each with
-inverse-frequency (\textit{balanced}) class weighting in the loss, plus an
-unweighted control on the security task. The local open
-tier runs six instruction-tuned models of 2.6--8.0\,B parameters on a single
-free-tier NVIDIA T4 under 4-bit NF4 quantisation~\cite{dettmers2023}. The hosted
-tier accesses Llama-3.3-70B and the commercial tier Gemini 3.1 Flash-Lite,
-both through free API tiers. A ninth prompted model was attempted and failed the
-reportability gate below; its predictions remain in the raw store but enter no
-table.
+inverse-frequency class weighting in the loss, plus an unweighted control on the
+security task. The local tier runs six instruction-tuned models of 2.6--8.0\,B
+parameters on a single free-tier NVIDIA T4 under 4-bit NF4
+quantisation~\cite{dettmers2023}. The hosted tier accesses Llama-3.3-70B and the
+commercial tier Gemini 3.1 Flash-Lite, both through free API tiers. A ninth
+prompted model was attempted and failed the reportability gate defined below;
+its predictions remain in the raw store but enter no table.
 
 \begin{table}[t]
-\caption{The twelve model configurations. Gemini's parameter count is
-undisclosed and is recorded as unknown rather than estimated.}
+\caption{The twelve model configurations. ``B'' is the published parameter count
+of the exact checkpoint, in billions; Gemini's is undisclosed and is recorded as
+unknown rather than estimated.}
 \label{tab:models}
 \centering
 \footnotesize
@@ -374,18 +449,43 @@ Gemini 3.1 F-Lite & {\scriptsize\texttt{gemini-3.1-flash-lite}}    & n/a  & comm
 \end{tabular}
 \end{table}
 
-\subsection{Prompting and strict parsing}
-Each prompted model answers a fixed instruction naming the task, enumerating the
-label vocabulary and demanding exactly one word in reply, sent as a single user
-message (Fig.~\ref{fig:prompt}). Decoding is greedy---temperature $0$, at most
-twelve new tokens---so the only stochastic element in this arm is item sampling.
-Few-shot conditions insert deterministic, class-balanced exemplars ($k \in
-\{2,4,8\}$ in total on the binary tasks, $k \in \{1,2\}$ per class on the
-sub-types) carved out of the corpus \emph{before} the evaluation frames are
-formed, so an exemplar is never also a test item. Two sub-studies vary one factor
-at a time---the phrasing (\emph{base}, \emph{terse}, \emph{verbose}) and the
-few-shot ladder; the hosted and commercial arms run zero-shot only, under
-provider rate limits.
+\subsection{Prompt design and what it is meant to control}
+\label{sec:prompt}
+Each prompted model answers a fixed instruction that names the task, enumerates
+the label vocabulary and requires exactly one word in reply, sent as a single
+user message (Fig.~\ref{fig:prompt}). Decoding is greedy---temperature $0$, at
+most twelve new tokens---so the only stochastic element is item sampling.
+
+Fixing the instruction needs justifying, because a different wording could give
+a different result. Three points define what the choice does and does not claim.
+
+\emph{Where the wording comes from.} The template follows the zero-shot format
+used in the LLM requirements-classification studies we compare
+against~\cite{binkhonain2025,alhoshan2025,tang2025}: a short task statement, an
+explicit list of permitted labels, and an instruction to answer with the label
+alone. We did not tune it against the test items. A conventional instruction
+keeps the comparison with prior work interpretable; a tuned one would not.
+
+\emph{We do not claim it is the best prompt.} Almost certainly it is not. What
+the design requires is a \emph{fixed} instruction, so that the only quantity
+varying across the three regimes is the distribution shift. If the prompt were
+re-optimised per regime, a difference between regimes could no longer be
+attributed to the shift. The fixed prompt is a control, not a recommendation.
+
+\emph{What the wording is worth is measured, not assumed.} Two sub-studies vary
+one factor at a time. The first re-runs two models over three phrasings of the
+same question---\emph{base}, \emph{terse} and \emph{verbose}---with the answer
+contract held identical; Table~\ref{tab:prompt} reports all nine paired cells.
+Its last column gives the gain an oracle would obtain by picking the best of the
+three wordings for each cell: a median of $+0.003$ \Fm{} and a maximum of
+$+0.036$, far smaller than the differences this paper's conclusions rest on.
+Picking that wording would in any case need labelled data from the target
+corpus, which is the resource prompting is meant to do without. The second
+sub-study is a few-shot ladder ($k \in \{2,4,8\}$ in total on the binary tasks,
+$k \in \{1,2\}$ per class on the sub-types) with deterministic, class-balanced
+exemplars carved out of the corpus \emph{before} the evaluation frames are
+formed, so an exemplar is never also a test item. The hosted and commercial
+tiers run zero-shot only, under provider rate limits.
 
 \begin{figure}[t]
 \centering
@@ -406,47 +506,105 @@ Now classify this one:\\[4pt]
 Requirement:\\
 """{\rmfamily\itshape the requirement under test}"""\\[4pt]
 Answer:}}
-\caption{The \emph{base} FR/NFR instruction, verbatim, and the position at which
-few-shot exemplars are injected. The \emph{terse} and \emph{verbose} phrasings
-vary only the instruction block: the answer contract---exactly one word---is
-identical across all three, and is what the strict parser enforces.}
+\caption{The \emph{base} FR/NFR instruction, verbatim, and where few-shot
+exemplars are injected. The sub-type tasks use the same template with the
+permitted labels listed in place of ``FR''/``NFR'', which is how the top-4,
+top-6 and all-11 variants differ for a prompted model. The \emph{terse} and
+\emph{verbose} phrasings change only the instruction block.}
 \label{fig:prompt}
 \end{figure}
 
+\begin{table}[t]
+\caption{What the wording is worth: \Fm{} under each of the three wordings on
+the same items, for the nine paired cells of the phrasing sub-study.
+``Spread'' is the range across the three; ``oracle'' is the gain over
+\emph{base} that a chooser with access to the target labels would obtain.
+PR~=~\pex{}, SR~=~SecReq.}
+\label{tab:prompt}
+\centering
+\footnotesize
+\input{tables/tab_prompt}
+\end{table}
+
+\subsection{Parsing, metrics, and how to read them}
+\label{sec:metrics}
 Outputs are parsed by a strict, word-boundary-aware rule: a leading label wins;
 otherwise exactly one label named anywhere in the reply wins; a reply naming
-both labels or neither is \emph{unparseable and scored as wrong}. This is
-deliberately harsher than the lenient protocols common in prior work, and it
-matches deployment, where an unusable answer is not a free pass. The same rule
-is applied at generation time and again in an idempotent repair pass over the
-archived raw outputs, so stored and scored predictions cannot diverge silently.
+both labels or neither is unparseable and is scored as wrong. This is harsher
+than the lenient protocols common in prior work, and it matches deployment,
+where an unusable answer is not a free pass. The same rule is applied at
+generation time and again in an idempotent repair pass over the archived raw
+outputs, so stored and scored predictions cannot diverge.
 
-\subsection{Metrics, reportability, and significance}
-The primary metric is \Fm{} over the declared label set, with weighted F1 and
-accuracy alongside. Uncertainty uses a stratified bootstrap~\cite{efron1993}:
-2{,}000 resamples drawn within each true class (seed 42), so no resample can lose
-a rare class. Encoder--LLM comparisons use the exact two-sided McNemar test on
-paired disagreements~\cite{mcnemar1947,dietterich1998}; all 260 are corrected as
-one family under both Holm~\cite{holm1979} and
-Benjamini--Hochberg~\cite{benjamini1995} at $\alpha = 0.05$, with verdicts
-keyed on the BH-adjusted $p$ (175 significant raw, 170 after BH, 131 after Holm).
-A cell (model $\times$ task $\times$ dataset $\times$ regime) is reported only
-if every class has $\geq 5$ test items, the cell holds $\geq 40$ items, and the
-model parsed $\geq 50\%$ of its responses; 6 of 87 cells fail this gate and are
-excluded rather than imputed. Majority-class and stratified-random baselines run
-through the same scorer. The store holds 76{,}115 predictions: 24{,}280 encoder,
-35{,}049 prompted binary, 16{,}786 prompted sub-type.
+Four kinds of quantity are reported, and because they are easy to confuse we
+state what each one is. \emph{Macro-F1} is the unweighted mean of the per-class
+F1 scores over the full declared label set of the task variant; it is the
+primary metric because it does not let a model score well by ignoring a rare
+class, and the majority-class baseline in the last row of Table~\ref{tab:main}
+gives every score a floor to be read against. \emph{Relative loss}
+($\Delta\%$ in Table~\ref{tab:loss}) is the share of a configuration's own
+in-domain macro-F1 lost in a shifted regime, on the same items; it is defined
+only for the encoders, since only they have an in-domain fit to lose.
+\emph{Predicted class share} is the fraction of test items a model assigns to a
+class. It is not an accuracy: it is what the model takes the class balance to
+be, read against the true prevalence in the same items. It and relative loss are
+both percentages, so Section~\ref{sec:rq2} names the class and the corpus each
+time one is used. \emph{Test counts} are numbers of statistical comparisons, not
+of items: each unit is one exact McNemar test between one encoder configuration
+and one prompted model in one cell.
+
+Uncertainty uses a stratified bootstrap~\cite{efron1993}: 2{,}000 resamples
+drawn within each true class (seed 42), so no resample can lose a rare class.
+Encoder--LLM comparisons use the exact two-sided McNemar test on paired
+disagreements~\cite{mcnemar1947,dietterich1998}; all 260 are corrected as one
+family under both Holm~\cite{holm1979} and
+Benjamini--Hochberg~\cite{benjamini1995} at $\alpha = 0.05$, with verdicts keyed
+on the BH-adjusted $p$ (175 significant before correction, 170 after BH, 131
+after Holm). A cell---one model, task, dataset and regime---is reported only if
+every class has at least 5 test items, the cell holds at least 40 items, and the
+model parsed at least 50\% of its responses; 6 of 87 cells fail this gate and are
+excluded rather than imputed. The store holds 76{,}115 predictions: 24{,}280 from
+the encoders, 35{,}049 prompted binary and 16{,}786 prompted sub-type.
 
 \subsection{Cost model}
 \label{sec:costmodel}
-Every prediction row records tokens, wall-clock latency and, for encoders,
-training time. Local computation is priced as an imputed rental of the benchmark
-GPU (AWS \texttt{g4dn.xlarge}, one NVIDIA T4, \$0.5260/h on demand); API models
-at provider list token rates (Gemini 3.1 Flash-Lite \$0.25/\$1.50 per million
-input/output tokens, Llama-3.3-70B \$0.59/\$0.79), frozen into each row at
-generation time. Encoder cost separates the one-off fine-tuning cost $C_0$ from
-the marginal per-item cost $c_{\text{enc}}$, giving a break-even volume against
-any prompted alternative
+Every prediction row records input and output token counts, wall-clock latency
+and, for the encoders, training time. Cost is then computed from those recorded
+quantities rather than estimated afterwards, and the basis differs by tier
+because the two kinds of model are billed differently.
+
+\emph{Models that run on our own hardware are priced on compute.} That covers
+the fine-tuned encoders and all six local open-weight models: they are free to
+download and carry no licence fee, so the only thing to charge for is the
+machine time they consume. We price it as an imputed rental of the benchmark
+GPU---an AWS \texttt{g4dn.xlarge} with one NVIDIA T4, at the published
+on-demand list rate for \texttt{us-east-1} of \$0.5260 per hour, recorded in
+the pipeline manifest with the date it was checked. That is a list price for
+hardware, not a market price for the model, and it assumes sequential unbatched
+inference; the stored sensitivity table reports the same costs at the spot rate
+(\$0.3162/h) and at batch sizes 8 and 32, which cut the local figures by roughly
+an order of magnitude.
+
+\emph{Models behind an API are priced on tokens}, at the provider's published
+list rate per million input and output tokens---\$0.25/\$1.50 for Gemini 3.1
+Flash-Lite and \$0.59/\$0.79 for Llama-3.3-70B, taken from the providers' public
+rate cards in August 2026 and frozen into every prediction row at generation
+time, so a later price change cannot alter a stored result. Both models were in
+fact run on free tiers; the list rate is what the same volume would have cost.
+
+Neither basis is a fixed property of the technique, and cost should be expected
+to move with model size and capability. Within the compute-priced tier it does:
+over the ten locally executed configurations, cost per item rises with parameter
+count (Spearman $\rho = 0.85$). That is why Table~\ref{tab:cost} puts parameter
+counts next to prices and why Section~\ref{sec:rq3} states the comparison as a
+ratio between tiers rather than an absolute price that would date. The ordering
+is not perfectly monotonic in size, because a locally run model is charged for
+the wall-clock time it occupies the GPU, and a model that emits longer replies
+pays for them at equal size.
+
+Encoder cost separates the one-off fine-tuning cost $C_0$ from the marginal
+per-item cost $c_{\text{enc}}$, which gives a break-even volume against any
+prompted alternative
 \begin{equation}
 N^{\star} \;=\; \frac{C_0}{c_{\text{alt}} - c_{\text{enc}}} .
 \label{eq:breakeven}
@@ -455,206 +613,255 @@ Because free-tier latency is dominated by provider-side queueing, wall-clock
 projections use per-request median latency, with the queue-inflated mean
 reported separately.
 
+\begin{table}[t]
+\caption{Cost and latency by access tier, with the basis on which each is
+priced. USD/1k is the inference cost of 1{,}000 classifications; where a tier
+holds several models the range spans their per-model medians. ``Train'' is the
+one-off fine-tuning cost of a deployable model. Rates are those of
+Section~\ref{sec:costmodel}.}
+\label{tab:cost}
+\centering
+\footnotesize
+\input{tables/tab_cost}
+\end{table}
+
 %% ===========================================================================
 \section{Results}
 \label{sec:results}
 %% ===========================================================================
 
-\subsection{RQ1: in-domain, supervision still wins}
-Table~\ref{tab:indomain} reports in-domain \Fm{} for all twelve configurations
-over the six task $\times$ dataset cells. Fine-tuned encoders post the best
-score in five of six columns: class-weighted BERT reaches 0.908 on FR/NFR and
-0.923 on \pex{} security, and class-weighted RoBERTa reaches 0.936 / 0.837 /
-0.724 on the top-4 / top-6 / all-11 sub-type variants. The single exception is
-SecReq security, where 4-bit Qwen2.5-7B posts the better point estimate (0.846
-against 0.836)---a lead that never reaches significance (exact McNemar $p =
-0.696$; BH-adjusted $0.774$).
-
-Three observations qualify the ranking. Scale does not order the results: the
-2.6\,B Gemma-2-2B beats the hosted 70\,B model on \pex{} security (0.900 against
-0.891), and the small open models collapse on FR/NFR (0.554--0.727) while
-remaining competitive on security. The encoder advantage widens with the label
-set---$+0.014$ on top-4, $+0.013$ on top-6, but $+0.095$ on all-11---as expected
-if supervision mainly buys the long tail. And because cell sizes differ ($n = 59$--968), the top-4 ranking was recomputed
-on the 59 items every model answered, where the best encoder still leads the best
-prompted model by $+0.036$ (0.966 against 0.930): the ordering is not an artefact
-of coverage. Every reportable model clears the majority-class baseline.
-
-The paired tests make the in-domain verdict exact: over 106 in-domain
-comparisons, encoders win 67 and lose \emph{none}
-(Fig.~\ref{fig:inversion}\,(b)).
+Table~\ref{tab:main} is the paper's single results table. It carries all twelve
+configurations, the six task-by-corpus cells and every regime each cell
+supports, so encoders and prompted models are read off the same rows and
+columns. The encoders have one score per regime because they are re-fitted at
+each; a prompted model has one score per cell, written across the regime columns
+it spans, because a model that consumes no training data cannot score
+differently when the training data changes.
 
 \begin{table*}[t]
-\caption{RQ1---in-domain \Fm{} for all twelve configurations. Best per column in
-bold; ``---'' marks a cell below the reportability gate or not run. Encoder
-cells are 5-fold cross-validated over all items ($n$ = 968, 968, 444, 353, 433,
-524); prompted cells are stratified samples of the same items ($n$ = 59--960),
-so all comparisons in Fig.~\ref{fig:inversion} are paired item-for-item.}
-\label{tab:indomain}
+\caption{Macro-F1 for all twelve configurations, across every task, corpus and
+evaluation regime. \ID{}~=~in-domain, \XP{}~=~cross-project, \XD{}~=~cross-dataset.
+Best per column in bold; ``---'' marks a cell below the reportability gate of
+Section~\ref{sec:metrics} or a regime that does not apply. A prompted model's
+score is written once across the regimes of its cell, because it consumes no
+training data and the regime cannot move it. Encoder cells are cross-validated
+over all items ($n$~=~968 for the \pex{} tasks, 444 for SecReq, 353/433/524 for
+the sub-type variants); prompted cells are stratified samples of the same items
+($n$~=~59--960), and all comparisons are paired item-for-item.}
+\label{tab:main}
 \centering
-\footnotesize
-\input{tables/tab_in_domain}
+\scriptsize
+\input{tables/tab_main}
 \end{table*}
 
-\subsection{RQ2: the verdict inverts under distribution shift}
+\subsection{RQ1: within one corpus, supervision is still ahead}
+Reading the \ID{} columns of Table~\ref{tab:main}, fine-tuned encoders hold the
+best score in five of the six cells. Class-weighted BERT leads on FR/NFR and on
+\pex{} security, and class-weighted RoBERTa leads on all three sub-type
+granularities. The exception is SecReq security, where 4-bit Qwen2.5-7B posts
+the better point estimate (0.846 against 0.836), a lead that does not reach
+significance (exact McNemar $p = 0.696$; BH-adjusted $0.774$).
+
+Three observations qualify that ranking. Scale does not order the results: the
+2.6\,B Gemma-2-2B beats the hosted 70\,B model on \pex{} security, and the small
+open models fall well below the encoders on FR/NFR while staying competitive on
+security. The encoder advantage widens as the label set grows---from $+0.014$ on
+top-4 and $+0.013$ on top-6 to $+0.095$ on all-11 over the best prompted
+model---as one would expect if supervision mainly buys the long tail of rare
+classes. Cell sizes differ, so the top-4 ranking was recomputed on the 59 items
+every model answered; the best encoder still leads there by $+0.036$ (0.966
+against 0.930), so the ordering is not an artefact of coverage. Every reportable
+model clears its majority-class baseline.
+
+The paired tests make the in-domain verdict precise. Of the 106 in-domain
+encoder-versus-LLM comparisons, the encoder wins 67, 39 are inconclusive, and
+none is lost (Fig.~\ref{fig:inversion}\,(b)).
+
+\subsection{RQ2: the ranking reverses under distribution shift}
 \label{sec:rq2}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_inversion.pdf}
-\caption{The inversion. (a) On the security task over identical \pex{} items,
-both encoders start well above the range spanned by the eight prompted models
-and fall through it as distribution shift increases. (b) The same reversal in
-the paired tests: 260 exact McNemar comparisons, split by the regime the encoder
-was evaluated under.}
+\caption{(a) Security classification on \pex{}; all three bars are scored on the
+same 968 items at every regime. The encoders are re-fitted at each regime; the
+third bar is the median of the eight prompted models, with the whisker spanning
+their range, and it is flat because those models are never fitted. The red
+annotations are BERT's relative loss against its own in-domain score. (b) The
+260 paired encoder-versus-LLM comparisons, grouped by the regime the encoder was
+evaluated under. Each unit on the axis is one exact McNemar test, not one
+requirement.}
 \label{fig:inversion}
 \end{figure}
 
-Table~\ref{tab:transfer} lists every measured transfer, and
-Fig.~\ref{fig:inversion} shows the result in both metric and verdict form.
+Table~\ref{tab:loss} lists every measured transfer for the encoders, and
+Fig.~\ref{fig:inversion} shows the comparison against the prompted models.
 
 \textbf{Cross-project transfer is survivable.} Holding out unseen projects costs
-the encoders 3--12\% of their \Fm{} on \pex{} and up to 30\% on the much
-smaller SecReq, but leaves them ahead or tied in 76 of 90 paired tests---the
-degradation NoRBERT anticipated~\cite{hey2020norbert}, real but moderate.
+the encoders between 3\% and 12\% of their in-domain \Fm{} on \pex{}, and up to
+30\% on the much smaller SecReq, whose three project groups make a held-out group
+a third of the corpus. The encoders remain ahead or tied in 76 of the 90 paired
+tests at this regime---the degradation NoRBERT
+anticipated~\cite{hey2020norbert}: real, but moderate.
 
 \textbf{Cross-dataset transfer reverses the ranking.} The class-weighted BERT
-that scores 0.923 on \pex{} security falls to 0.528 on the \emph{very same
-items} once its training corpus is swapped for SecReq---a loss of 42.8\%.
-RoBERTa is more robust (0.902 $\rightarrow$ 0.698, $-23\%$) and the reverse
-direction milder still ($-17\%$), while the prompted models, tuning on nothing,
-move only with corpus difficulty ($-0.034$ to $+0.163$). Prompted models win 48
-of the 64 cross-dataset comparisons and encoders 3: in-domain 67--39--0 becomes
-3--13--48 (Fig.~\ref{fig:inversion}\,(b)), the same twelve models and the same
-scorer, the opposite conclusion.
+that scores 0.923 on \pex{} security falls to 0.528 on the same items once its
+training corpus is swapped for SecReq. That is a loss of 42.8\% of its in-domain
+macro-F1, and it is the largest loss in the study; it belongs to the
+cross-dataset regime, and should not be read against the cross-project losses in
+the previous paragraph, whose maximum is 29.6\%. RoBERTa is more robust
+($0.902 \rightarrow 0.698$, a loss of 23\%) and the reverse direction milder
+still (16--17\%). The prompted models, having nothing to re-fit, move only with
+the difficulty of the corpus. Over the 64 cross-dataset comparisons the prompted
+models win 48 and the encoders 3; the in-domain tally of 67--39--0 becomes
+3--13--48, on the same twelve models and the same scorer.
 
 \begin{table}[t]
-\caption{RQ2---encoder \Fm{} by evaluation regime, with the relative loss
-against the in-domain reference. Cross-dataset applies only to the security
-task, the one task both corpora annotate.}
-\label{tab:transfer}
+\caption{Relative loss under shift for the four fine-tuned encoders. $\Delta\%$
+is the share of that configuration's own in-domain \Fm{} lost in the shifted
+regime, on the same items. Prompted models are absent because they have no
+in-domain fit to lose; their scores are in Table~\ref{tab:main}. Cross-dataset
+applies only to the security task, the one both corpora annotate.}
+\label{tab:loss}
 \centering
 \footnotesize
-\input{tables/tab_transfer}
+\input{tables/tab_loss}
 \end{table}
 
-\textbf{Aggregate scores hide per-project failure.} On the leave-one-project-out
-arm of FR/NFR, across the 37 projects with comparable coverage, \emph{every}
-configuration---encoder and prompted alike---has at least one project it scores
-$0.000$ on and one it scores $1.000$ on; only the middle separates them (encoder
-median $0.917$, s.d.\ $0.198$, against $0.545$--$0.750$ and s.d.\
-$0.213$--$0.301$ for the small open models). A corpus-level average is a weak
-predictor of what a practitioner meets on their own project.
+\textbf{Corpus-level averages hide per-project failure.} On the
+leave-one-project-out variant of FR/NFR, over the 37 projects with comparable
+coverage, every configuration---encoder and prompted alike---has at least one
+project it scores 0.000 on and one it scores 1.000 on. Only the middle of the
+distribution separates them: the encoders' median per-project accuracy is 0.917
+(s.d.\ 0.198) against medians of 0.545--0.750 (s.d.\ 0.213--0.301) for the small
+open models. A corpus-level average is a weak predictor of what a practitioner
+meets on one project.
 
-\textbf{The mechanism is base-rate shift.} A performance drop alone does not say
-\emph{why} a model fails, and the two candidate explanations---unfamiliar
-vocabulary and shifted class priors---imply different remedies. The per-class
-evidence separates them (Fig.~\ref{fig:prior}). The transferred BERT labels
-44.2\% of \pex{} items \textit{security} against a true prevalence of 12.9\%,
-close to the 39.9\% prior of the corpus it was trained on. Its security-class
-precision collapses from 0.847 to 0.210 while recall falls far less
-(0.888 $\rightarrow$ 0.720): the model still finds the security requirements, it
-simply cannot stop finding them. That is the signature of prior shift, not of a
-model that has failed to understand the text.
+\textbf{The mechanism is a shift in class balance.} A drop in score does not by
+itself say why a model failed, and the two candidate explanations---unfamiliar
+vocabulary and a shifted class prior---imply different remedies. The per-class
+evidence separates them (Fig.~\ref{fig:prior}). After transfer from SecReq, BERT
+labels 44.2\% of the \pex{} items \textit{security}, against a true prevalence of
+12.9\% in those items and 39.9\% in the corpus it was trained on. That 44.2\% is
+a predicted class share, not a loss of score, and its closeness to the 42.8\%
+above is a coincidence. Its consequence is visible per class: precision on the
+security class falls from 0.847 to 0.210 while recall falls far less (0.888 to
+0.720). The model still finds the security requirements; it cannot stop finding
+them. That is the signature of a shifted prior, not of a model that has failed
+to read the text.
 
 The picture is not uniform, and we report it as measured. RoBERTa carries less
 of its source prior across (19.7\% predicted against 12.9\% true) and loses
-correspondingly less accuracy, and in the reverse direction both encoders predict
-\emph{below} the target prevalence (33.6\% and 29.1\% against 39.9\%), so
-content differences contribute there too. What the evidence supports is that the
+correspondingly less, and in the reverse direction both encoders predict
+\emph{below} the target prevalence (33.6\% and 29.1\% against 39.9\%), so content
+differences contribute there too. What the evidence supports is that the
 dominant term in the largest observed collapse is a prior the model brought with
-it---an encouraging diagnosis, because prior shift is correctable: threshold or
-prior adjustment~\cite{saerens2002,quinonero2009} needs no labels from the
-target corpus. Applying it would change the quantity being measured, so we leave
-it as the obvious next step.
+it. That is a comparatively encouraging diagnosis, since prior shift is
+correctable without labels from the target
+corpus~\cite{saerens2002,quinonero2009}. Applying such a correction would change
+the quantity being measured, so we leave it as the next step.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_prior_shift.pdf}
-\caption{One failure mode, three sources. (a) After cross-dataset transfer an
-encoder labels items at a rate pulled toward the base rate of the corpus it was
-\emph{trained} on. (b) The consequence: security-class precision collapses while
-recall is largely preserved---the signature of prior shift, not of unfamiliar
-vocabulary. (c) The prompted models have the same defect from another source:
-their FR/NFR accuracy ranks with how badly they mis-set the prior.}
+\caption{One failure mode, two sources. (a) After cross-dataset transfer an
+encoder labels items at a rate pulled towards the base rate of the corpus it was
+\emph{trained} on. The axis is the share of test items predicted
+\textit{security}, not a score. (b) The consequence for the same model:
+precision on the security class collapses while recall is largely preserved.
+(c) The prompted models show the same defect from another source: on FR/NFR
+their accuracy ranks with how far their predicted class share sits from the true
+one.}
 \label{fig:prior}
 \end{figure}
 
-\subsection{One failure mode, three sources}
+\subsection{One failure mode, two sources}
 \label{sec:prior}
 Section~\ref{sec:rq2} attributed the encoders' collapse to a prior carried over
-from training. The same instrument, turned on the prompted arm, finds the same
-defect there---arriving by a different route.
+from training. Turning the same instrument on the prompted models finds the same
+defect there, arriving by a different route.
 
-\emph{Prompted models also mis-set the prior, and it explains most of their
-error.} On FR/NFR the true NFR share is 54.2\%, yet every prompted model
-predicts NFR far less often---from 14.9\% (Qwen2.5-3B) to 43.4\%
-(Llama-3.3-70B)---and their accuracies rank almost exactly with that
-miscalibration (Spearman $\rho = 0.95$ over the eight reportable models,
-Fig.~\ref{fig:prior}\,(c)). The small open models' apparent ``collapse'' on
-FR/NFR is thus not an inability to read the requirement but a systematic bias
-toward answering \textsc{fr}.
+\emph{Prompted models also mis-set the class balance, and it explains most of
+their error.} On FR/NFR the true NFR share is 54.2\%, and every prompted model
+predicts NFR less often than that, from 14.9\% (Qwen2.5-3B) to 43.4\%
+(Llama-3.3-70B). Their accuracies rank almost exactly with that miscalibration
+(Spearman $\rho = 0.95$ over the eight reportable models,
+Fig.~\ref{fig:prior}\,(c)), so the small open models' weak FR/NFR scores reflect
+a systematic bias towards answering \textsc{fr} rather than an inability to read
+the requirement.
 
-\emph{The prompt wording moves the prior directly}---which makes the link causal
-rather than correlational. Across the nine paired model $\times$ task cells of
-the phrasing sub-study the median spread between the \emph{base}, \emph{terse}
-and \emph{verbose} wordings is only 0.044 \Fm{}, but the extreme is 0.485, for
-Gemma-2-2B on SecReq security (0.827 / 0.343 / 0.828). The predictions show what
-the terse wording does: it is the only variant phrased as a leading yes/no
-question, and under it Gemma-2-2B answers \textit{security} for 96.7\% of SecReq
-and 51.3\% of \pex{} items against true rates of 39.7\% and 12.7\%; Qwen2.5-7B
-shifts the same way but less far. This is not a formatting artefact---the strict
-parser accepted 99.98\% of the sub-study's 11{,}518 responses---so the answers
-were well-formed and simply wrong. Rewording the question re-set the model's
-prior exactly as re-training on another corpus re-set the encoder's, the
-instability behind calibration and ordering fixes in the prompting
-literature~\cite{zhao2021calibrate,lu2022fantastically}.
+\emph{The wording of the question moves that balance directly}, which is what
+makes the link causal rather than correlational. Across the nine paired cells of
+the phrasing sub-study (Table~\ref{tab:prompt}) the median spread between the
+three wordings is 0.044 \Fm{}, but the largest is 0.485, for Gemma-2-2B on
+SecReq security. The predictions show what the \emph{terse} wording does: it is
+the only variant phrased as a leading yes/no question, and under it Gemma-2-2B
+answers \textit{security} for 96.7\% of SecReq and 51.3\% of \pex{} items,
+against true rates of 39.7\% and 12.7\% in those frames. Qwen2.5-7B shifts the
+same way but less far. This is not a formatting artefact: the strict parser
+accepted 99.98\% of the sub-study's 11{,}518 responses, so the answers were
+well-formed and simply wrong. Re-wording the question re-set the model's prior
+in the same way that re-training on another corpus re-set the encoder's. Prompt
+sensitivity of this kind is documented in the prompting
+literature~\cite{zhao2021calibrate,lu2022fantastically}; what is new here is
+that it lands on the same failure mode as the encoders' transfer loss.
 
-\emph{Few-shot exemplars help precisely where they carry prior information.}
-Across the 90 paired comparisons on the six local models---the only tier that ran
-few-shot---the median gain is $+0.024$ \Fm{}, but the effect splits by task: it
-is net-negative on the binary tasks (mean $-0.007$ over 54 comparisons; the 30
-BH-significant effects average $-0.027$) and uniformly positive on the sub-types
-(mean $+0.062$ over 36; all 14 BH-significant effects are gains, averaging
-$+0.114$). Where the labels are a familiar convention the model already has a
-prior and examples mostly perturb it---Tang et al.'s over-prompting
-effect~\cite{tang2025}; where they are an unfamiliar eleven-class taxonomy, the
-exemplars are the only statement of what the classes are.
+\emph{Few-shot exemplars help where they carry information about the class
+balance.} Across the 90 paired comparisons on the six local models---the only
+tier that ran few-shot---the median gain is $+0.024$ \Fm{}, but the effect
+splits by task: slightly negative on the binary tasks (mean $-0.007$ over 54
+comparisons; the 30 BH-significant effects average $-0.027$) and positive on the
+sub-types (mean $+0.062$ over 36; all 14 BH-significant effects are gains,
+averaging $+0.114$). Where the labels are a familiar convention the model
+already has a prior and the examples mostly perturb it, which is the
+over-prompting effect Tang et al.\ report~\cite{tang2025}; where they are an
+unfamiliar eleven-class taxonomy, the exemplars are the only statement of what
+the classes mean.
 
-Read together, these are one defect with three sources. This task needs a class
-prior that cannot be read off the requirement text, and each approach acquires
-one somewhere it should not: the encoder from its training corpus, the prompted
-model from its pre-training and from the wording of the question. Neither family
-is calibrated to the corpus in front of it---which is why neither is safe to
-deploy on an in-distribution score alone.
+These are one defect with two sources. The task needs a class prior that cannot
+be read off the requirement text, and each family acquires one from somewhere it
+should not: the encoder from its training corpus, the prompted model from its
+pre-training and from the wording of the question. Neither is calibrated to the
+corpus in front of it, which is why neither is safe to deploy on an
+in-distribution score alone.
 
-\subsection{RQ3: the accuracy--cost frontier}
+\subsection{RQ3: the accuracy--cost trade-off}
 \label{sec:rq3}
-Fig.~\ref{fig:cost} gives the economics. Encoder
-inference costs \$0.0024 per 1{,}000 classifications on the imputed T4 rental
-against \$0.0216--\$0.1132 for prompted alternatives---9 to 47 times more, 18
-times at the medians. One-off fine-tuning is negligible (median \$0.0093 per
-deployable model, about 277 GPU-seconds over all folds of a family), so the
-break-even of Eq.~\eqref{eq:breakeven} is small: over all 276
-encoder-versus-alternative pairings $N^{\star}$ ranges from 46 to 552 items
-(median 215). The Pareto frontier over reportable cells holds ten cells, nine of
-them encoders; the single prompted frontier point is 4-bit Qwen2.5-7B on SecReq
-security---the strongest freely available fallback on the one cell where transfer
-is what is measured.
+Table~\ref{tab:cost} gives cost and latency by tier and Fig.~\ref{fig:cost} the
+frontier. Encoder inference costs \$0.0024 per 1{,}000 classifications on the
+imputed T4 rental. The prompted configurations range from \$0.0248 to \$0.0704
+per 1{,}000 on the same basis, taking each model's median across its cells: 10
+to 29 times the encoder, and about 19 times at the medians. One-off fine-tuning
+is small---a median of \$0.0093 per deployable model, about 277 GPU-seconds over
+all folds of a family---so the break-even of Eq.~\eqref{eq:breakeven} is reached
+quickly: over all 276 encoder-versus-alternative pairings $N^{\star}$ lies
+between 46 and 552 items, with a median of 215. The Pareto frontier over
+reportable cells holds ten cells, nine of them encoders. The one prompted
+frontier point is 4-bit Qwen2.5-7B on SecReq security, which is the strongest
+freely available option on the one cell where transfer is what is being
+measured.
 
-Latency behaves differently. Median per-request latency is 0.016\,s for the
-encoders and, across the prompted models, 0.095\,s for the hosted 70\,B model
-(the fastest prompted tier), 0.19--0.36\,s for the local open models and
-0.61\,s for the commercial API; but free-tier queueing inflates the hosted
-\emph{means} by up to two orders of magnitude, which is why all wall-clock
-projections use medians.
+Two qualifications keep these figures in proportion. They are ratios measured on
+one machine at one date, and the prices behind them move: list rates change, and
+cost within the compute-priced tier scales with model size
+(Section~\ref{sec:costmodel}). And the model prices computation only---the human
+annotation an encoder needs before it can be fine-tuned is excluded, which
+favours the encoder.
+
+Latency behaves differently from cost. The median per-request latency is
+0.016\,s for the encoders, 0.095\,s for the hosted 70\,B model, 0.194--0.356\,s
+for the local open models and 0.614\,s for the commercial API. Free-tier queueing
+inflates the hosted \emph{means} by up to two orders of magnitude, which is why
+all wall-clock projections use medians.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_cost.pdf}
 \caption{RQ3. (a) SecReq security, the one cell a prompted model leads: 4-bit
-Qwen2.5-7B buys $+0.011$ \Fm{} for $\approx19\times$ the cost per item. (b)
-Training is repaid within 46--552 classifications across all 276 pairings.}
+Qwen2.5-7B buys $+0.011$ \Fm{} for roughly $19\times$ the cost per item. (b)
+Cumulative cost against classified volume; fine-tuning is repaid within 46--552
+classifications across all 276 pairings. Both panels use the cost basis of
+Section~\ref{sec:costmodel}.}
 \label{fig:cost}
 \end{figure}
 
@@ -662,86 +869,139 @@ Training is repaid within 46--552 classifications across all 276 pairings.}
 \section{Discussion}
 %% ===========================================================================
 
-\looseness=-1 \textbf{The regime is part of the claim.} The most consequential finding here is
-not that one model class is better; it is that ``which is better?'' flips
-completely between two protocols the literature treats as interchangeable, on the
-same corpora, the same items and the same scorer. A benchmark reporting only
-in-distribution numbers is not a weaker version of one that reports transfer---it
-can be one that reports the opposite conclusion. Requirements-classification
-results should therefore state the regime as part of the claim, and
-``generalisation'' should mean held-out projects or independent corpora, not
-transfer across tasks on one dataset.
+\subsection{Generalizability}
+The most consequential result here is not that one family is better, but that
+the answer to ``which is better?'' changes between two protocols the literature
+treats as interchangeable, on the same corpora, the same items and the same
+scorer. A benchmark reporting only in-distribution numbers is not a weaker
+version of one that reports transfer; on this evidence it can report the
+opposite ordering. Two things follow. The regime belongs in the claim, next to
+the metric. And ``generalisation'' should mean held-out projects or an
+independently annotated corpus, not transfer across tasks within one dataset,
+which is what the term currently covers in parts of this
+literature~\cite{binkhonain2025}.
 
-\textbf{A decision rule for practitioners.} With a few hundred labelled
-requirements from the domain a team will operate in, and any non-trivial volume,
-a fine-tuned 110\,M-parameter encoder is both the most accurate and by far the
-cheapest option. Entering an unlabelled or shifting domain, a mid-size quantised
-open model is safer: it gives up in-domain accuracy, degrades gracefully, and
-runs free on one consumer-class GPU. The worst option is the implicit default of
-much recent work---fine-tuning on one corpus and assuming the result
+The limits of our own claim should be equally explicit. We observe the reversal
+on one corpus pair, one task both corpora annotate, and one language. The study
+establishes that the reversal is possible and large when it happens, not that it
+occurs at any particular rate across requirements corpora. The mechanism we
+identify---a class prior carried over from the training corpus---is what would
+make it recur, and it can be checked on any new pair without re-running our
+models, by comparing the predicted class share against the target prevalence.
+
+\subsection{Consistency and reliability}
+Accuracy averaged over a corpus is not the only property a practitioner needs.
+Two kinds of instability appear in the results, one in each family.
+
+The encoders are stable given a fixed training distribution and unstable when it
+moves: their scores change little across folds within a corpus but lose up to
+42.8\% of their in-domain macro-F1 when the training corpus is replaced. Their
+failure is at least predictable from something checkable before deployment,
+namely the class balance of the corpus they were fitted on relative to the
+target.
+
+The prompted models are stable across regimes---by construction, since nothing
+is re-fitted---but unstable with respect to the question. Re-wording the same
+instruction, with the answer contract held fixed, moved macro-F1 by up to 0.485
+in one cell. A deployment that pins its prompt gets repeatable answers, but the
+level at which they are repeatable was set by a wording choice no
+in-distribution study would surface. Both families also show wide per-project
+variance, with every configuration recording at least one project scored 0.000
+and one scored 1.000. A corpus-level mean reported without a per-project spread
+overstates how reliable either family is in practice.
+
+\subsection{Accuracy--cost trade-off}
+For a team with a few hundred labelled requirements from the domain it will
+operate in, and any non-trivial volume, a fine-tuned encoder of about 110\,M
+parameters is both the more accurate and much the cheaper option, and it repays
+its training cost within a few hundred classifications. Entering an unlabelled
+or shifting domain changes the answer: a mid-size quantised open model gives up
+in-domain accuracy, degrades more gracefully, and runs on one consumer-class GPU
+without an API contract. What the results argue against is the implicit default
+of much recent work---fine-tuning on one corpus and assuming the result
 transfers.
 
-\textbf{Contamination cuts in our favour.} Both corpora are old, small and
-public, so prompted in-domain scores may be inflated by pre-training
-contamination~\cite{sainz2023}. That bias \emph{overstates} the prompted models
-in-domain---exactly where we report the encoders winning---so the observed
-encoder advantage is conservative; and it cannot produce the cross-dataset
-reversal, since it would help the prompted models in both regimes equally.
+The trade-off is a ratio, not a price. The absolute figures in
+Section~\ref{sec:rq3} are tied to one GPU, one date and two rate cards; what
+should survive is the order of magnitude between a 110\,M-parameter encoder and
+a multi-billion-parameter generative model doing the same classification, and
+the fact that within the compute-priced tier cost tracks model size. The
+annotation an encoder route needs is real and sits outside the model: a team
+without labels is not choosing between two prices per thousand items, it is
+choosing between annotating and not.
 
-\textbf{Availability.} The pipeline, the frozen splits, the full prediction store
-and the scripts that regenerate every table and figure from it are public; splits
-are hash- and seed-pinned and scoring is a pure function of the stored raw
-outputs, so every number reproduces without re-running a model.
+\subsection{Contamination and availability}
+Both corpora are old, small and public, so prompted in-domain scores may be
+inflated by pre-training contamination~\cite{sainz2023}. That bias would
+overstate the prompted models in-domain, which is where we report the encoders
+winning, so the in-domain encoder advantage is conservative; and it cannot
+produce the cross-dataset reversal, since it would help the prompted models in
+both regimes equally. The pipeline, the frozen splits, the full prediction store
+and the scripts that regenerate every table and figure are public. Splits are
+hash- and seed-pinned and scoring is a pure function of the stored raw outputs,
+so every number here reproduces without re-running a model.
 
 %% ===========================================================================
 \section{Threats to Validity}
 %% ===========================================================================
 
-\textbf{Internal.} The commercial arm ran at $n \approx 60$ per cell, where 23 of
-its 26 paired comparisons are inconclusive, so ``never significantly beaten''
-partly reflects limited power. Free-tier quotas caused missing-not-at-random
-dropout on some hosted configurations; the gate excludes the affected cells
-rather than imputing them. Local models ran 4-bit quantised, which may understate
-full-precision accuracy, and each configuration used a single seed, so small
-encoder-to-encoder margins should not be over-read.
+\textbf{Internal.} The commercial tier ran at about 60 items per cell, where 23
+of its 26 paired comparisons are inconclusive, so ``never significantly beaten''
+partly reflects limited statistical power. Free-tier quotas caused
+missing-not-at-random dropout on some hosted configurations; the reportability
+gate excludes the affected cells rather than imputing them. Local models ran
+4-bit quantised, which may understate full-precision accuracy, and each
+configuration used a single seed, so small encoder-to-encoder margins should not
+be over-read.
 
-\textbf{Construct.} GPU costs are imputed from a published rental rate, not
-billed, and token prices are 2026 list prices---the ratios are more durable than
-the absolutes. $N^{\star}$ is a pure cost crossover computed regardless of the
-accuracy gap, and the model prices computation only: the human annotation cost an
-encoder needs is excluded, which favours the encoder. Strict scoring counts
-format non-compliance as error, matching deployment but differing from lenient
-protocols.
+\textbf{Construct.} GPU costs are imputed from a published rental rate rather
+than billed, and token prices are 2026 list rates, so the ratios are more
+durable than the absolute values. $N^{\star}$ is a pure cost crossover computed
+regardless of the accuracy gap, and the cost model prices computation only, so
+the annotation an encoder needs is excluded---which favours the encoder. Strict
+scoring counts format non-compliance as error, matching deployment but differing
+from the lenient protocols of some prior work. The prompt is fixed by design
+(Section~\ref{sec:prompt}); the phrasing sub-study bounds what a better wording
+would be worth on two models and nine cells, not on all eight.
 
 \textbf{External.} Both corpora are small, dated and public, and their security
-label sets differ---\pex{}'s derives from the \textsc{se} sub-class and is
+label sets differ: \pex{}'s is derived from the security sub-class and is
 non-functional by construction, whereas SecReq annotates any security-relevant
-sentence---so the cross-dataset arm carries definitional as well as
+sentence. The cross-dataset regime therefore carries definitional as well as
 distributional shift, on one corpus pair. Results cover English requirements and
 one NFR taxonomy.
 
-\textbf{Conclusion.} All paired tests are exact and multiplicity-corrected as one
-family, and the frozen splits are stored once and never regenerated because
+\textbf{Conclusion.} All paired tests are exact and multiplicity-corrected as
+one family, and the frozen splits are stored once and never regenerated because
 grouped-fold membership is library-version dependent.
 
 %% ===========================================================================
 \section{Conclusion}
 %% ===========================================================================
 
-\looseness=-1 Twelve configurations, three tasks, three regimes: 76{,}115
-predictions scored under one strict rule, with 260 paired tests corrected as one
-family. In-domain the encoders are never significantly beaten; across corpora the
-prompted models win 48 of 64; and encoders stay an order of magnitude cheaper.
-Both families carry an uncalibrated class prior---the encoder from its training
-corpus, the prompted model from the wording of the question. Two protocols the
-field treats as interchangeable therefore return opposite rankings from the same
-data---so an in-distribution score is not a partial answer, it can be the wrong
-one.
+We compared four fine-tuned encoder configurations against eight prompted LLMs
+on three requirements-classification tasks, holding the items, the label sets
+and the scoring rule fixed and varying only the distribution shift between what
+a model was fitted on and what it was scored on. Within a corpus the encoders
+are ahead and are never significantly beaten. Across an independently annotated
+corpus the ordering reverses and the prompted models are ahead in most
+comparisons, while the encoders remain an order of magnitude cheaper per item.
+The cause is the same in both families: a class prior acquired from somewhere
+other than the corpus being classified---from the training data in one case,
+from the wording of the instruction in the other.
+
+An in-distribution score is therefore not a partial answer to the question of
+which approach to adopt; it can be the wrong one. Work in this area should
+report the evaluation regime as part of the result, and should treat the
+predicted class balance as a diagnostic to check before deployment rather than a
+detail of the confusion matrix.
 
 \balance
 \begin{thebibliography}{00}
 
 \bibitem{clelandhuang2007} J. Cleland-Huang, R. Settimi, X. Zou, and P. Solc, ``Automated classification of non-functional requirements,'' \emph{Requirements Eng.}, vol.~12, no.~2, pp.~103--120, 2007.
+
+\bibitem{iso29148} \emph{ISO/IEC/IEEE 29148:2018(E) --- Systems and Software Engineering---Life Cycle Processes---Requirements Engineering}, pp.~1--104, 30 Nov.\ 2018, doi: 10.1109/IEEESTD.2018.8559686.
 
 \bibitem{kurtanovic2017} Z. Kurtanovi\'{c} and W. Maalej, ``Automatically classifying functional and non-functional requirements using supervised machine learning,'' in \emph{Proc. IEEE 25th Int. Requirements Eng. Conf. (RE)}, 2017, pp.~490--495.
 
@@ -753,7 +1013,7 @@ one.
 
 \bibitem{elhajjami2024} A. El-Hajjami, N. Fafin, and C. Salinesi, ``Which AI technique is better to classify requirements? An experiment with SVM, LSTM, and ChatGPT,'' arXiv:2311.11547, 2024.
 
-\bibitem{kaur2024} K. Kaur and P. Kaur, ``The application of AI techniques in requirements classification: A systematic mapping,'' \emph{Artif. Intell. Rev.}, vol.~57, art.~57, 2024.
+\bibitem{kaur2024} K. Kaur and P. Kaur, ``The application of AI techniques in requirements classification: A systematic mapping,'' \emph{Artif. Intell. Rev.}, vol.~57, art.~57, 2024, doi: 10.1007/s10462-023-10667-1.
 
 \bibitem{sonawane2024} S. N. Sonawane and S. M. Puthran, ``Classification of functional and nonfunctional requirements based on convolutional neural network with flower pollination optimizer,'' \emph{Innov. Syst. Softw. Eng.}, 2024.
 
