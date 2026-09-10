@@ -71,3 +71,25 @@ Figures use the Okabe–Ito-derived four-colour categorical set
 local open-weight / commercial). It passes the lightness-band, chroma, CVD-separation
 and normal-vision checks, and every tier additionally carries a marker shape or hatch
 so the figures stay readable in greyscale.
+
+## Word version
+
+`paper-revised.docx` is the same paper as a Word file, for review outside
+LaTeX. It is generated, not hand-edited:
+
+```bash
+cd scripts
+python3 tex2docx_content.py          # main.tex + tables/ -> scripts/paper.json
+npm install docx                     # once
+node build_docx.js ../paper-revised.docx
+```
+
+`tex2docx_content.py` understands only the constructs this paper uses and
+resolves citation, section, table and figure numbers the way LaTeX does, so the
+two versions carry the same numbering. Figure 1 is rendered from
+`figures/fig_architecture.tex` via a `standalone` compile to
+`figures/fig_architecture.png`; the other figures use the PNGs that
+`make_figs.py` writes alongside the PDFs.
+
+Regenerate the tables and figures before rebuilding the `.docx`, or it will
+carry stale numbers.
