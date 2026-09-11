@@ -27,6 +27,22 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{balance}
 \usepackage{pifont}
+
+% ---------------------------------------------------------------------------
+% ICCI 2026 reviews double-blind: "The initial submission must not include the
+% author(s)' information."  Leave this true for the CMT submission; set it
+% false for the camera-ready, which does carry the author block.
+% ---------------------------------------------------------------------------
+\newif\ifanonymous
+\anonymoustrue
+
+% The availability claim would deanonymise the authors if a reviewer searched
+% for the artefacts, so it is deferred while under review.
+\newcommand{\availability}{%
+  \ifanonymous will be released with the paper\else are public\fi}
+
+% Belt and braces: keep author names out of the PDF metadata as well.
+\ifanonymous\hypersetup{pdfauthor={}, pdfsubject={}, pdfkeywords={}}\fi
 % The IEEE template labels the keyword block "Keywords"; IEEEtran's default is
 % "Index Terms".
 \renewcommand{\IEEEkeywordsname}{Keywords}
@@ -76,12 +92,16 @@
        Cross-Dataset Generalization and Cost-Efficiency}
 
 % Author block laid out on the template's lines: names, dept., organization,
-% city and country, contact.
-\author{\IEEEauthorblockN{Fatma El-Zahraa Samir, Khaled T. Wassif, and Lamia AbouZeid}
-\IEEEauthorblockA{\textit{Faculty of Computers and Artificial Intelligence}\\
-\textit{Cairo University}\\
-Giza, Egypt\\
-fatmaelzahraasamirabdelfattah@gmail.com}}
+% city and country, contact.  Withheld while \ifanonymous is true.
+\ifanonymous
+  \author{\IEEEauthorblockN{}\IEEEauthorblockA{}}
+\else
+  \author{\IEEEauthorblockN{Fatma El-Zahraa Samir, Khaled T. Wassif, and Lamia AbouZeid}
+  \IEEEauthorblockA{\textit{Faculty of Computers and Artificial Intelligence}\\
+  \textit{Cairo University}\\
+  Giza, Egypt\\
+  fatmaelzahraasamirabdelfattah@gmail.com}}
+\fi
 
 \maketitle
 
@@ -748,9 +768,9 @@ contamination~\cite{sainz2023}. That bias would overstate the prompted models
 in-domain, which is where we report the encoders winning, so the in-domain
 advantage is conservative; and it cannot produce the cross-dataset reversal,
 since it would help them in both regimes equally. The pipeline, the splits, the
-prediction store and the scripts that regenerate every table and figure are
-public, and scoring is a pure function of the stored outputs, so every number
-reproduces without re-running a model.
+prediction store and the scripts that regenerate every table and figure
+\availability{}, and scoring is a pure function of the stored outputs, so every
+number reproduces without re-running a model.
 
 %% ===========================================================================
 \section{Threats to Validity}

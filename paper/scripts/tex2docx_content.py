@@ -12,6 +12,8 @@ tex = open(os.path.join(PAPER, 'main.tex')).read()
 _arch = open(os.path.join(PAPER, 'figures', 'fig_architecture.tex')).read()
 tex = tex.replace('\\input{figures/fig_architecture}', _arch)
 
+ANON = re.search(r'^\s*\\anonymous(true|false)', tex, re.M).group(1) == 'true'
+
 # ---------------------------------------------------------------- references
 bib = tex[tex.index('\\begin{thebibliography}'):tex.index('\\end{thebibliography}')]
 keys, entries = [], []
@@ -112,6 +114,8 @@ def eqref(s):
 def runs(s):
     """Return [{text, bold, italic, mono}] for one paragraph of LaTeX."""
     s = cites(refs(eqref(s)))
+    s = re.sub(r'\\availability(\{\})?',
+               'will be released with the paper' if ANON else 'are public', s)
     s = re.sub(r'\\pex(\{\})?', 'PROMISE_exp', s)
     s = re.sub(r'\\Fm(\{\})?', 'macro-F1', s)
     s = re.sub(r'\\ID(\{\})?', 'ID', s)
@@ -373,16 +377,34 @@ for kind, chunk in pieces:
 
 # ----------------------------------------------------------------- front
 front = tex[:tex.index('\\section{Introduction}')]
-title = re.search(r'\\title\{(.*?)\}\s*\n(?:\s*%[^\n]*\n)*\s*\\author', front, re.S).group(1)
+def _braced(src, macro):
+    i = src.index(macro) + len(macro)
+    while src[i] != '{':
+        i += 1
+    i += 1
+    depth, start = 1, i
+    while depth:
+        if src[i] == '{': depth += 1
+        elif src[i] == '}': depth -= 1
+        i += 1
+    return src[start:i-1]
+
+
+title = _braced(front, '\\title')
 abstract = re.search(r'\\begin\{abstract\}(.*?)\\end\{abstract\}', front, re.S).group(1)
 kw = re.search(r'\\begin\{IEEEkeywords\}(.*?)\\end\{IEEEkeywords\}', front, re.S).group(1)
 
-names = re.search(r'\\IEEEauthorblockN\{(.*?)\}', front, re.S).group(1)
-block = re.search(r'\\IEEEauthorblockA\{(.*?)\}\}', front, re.S).group(1)
-affil_lines = [runs(x) for x in block.split('\\\\') if clean(x).strip()]
+if ANON:
+    names, affil_lines = '', []
+else:
+    _named = front[front.index('\\else', front.index('\\ifanonymous\n  \\author')):]
+    names = re.search(r'\\IEEEauthorblockN\{(.*?)\}', _named, re.S).group(1)
+    block = re.search(r'\\IEEEauthorblockA\{(.*?)\}\}', _named, re.S).group(1)
+    affil_lines = [runs(x) for x in block.split('\\\\') if clean(x).strip()]
 
 doc = dict(
     title=clean(title.replace('\\\\', ' ')),
+    anonymous=ANON,
     authors=clean(names),
     affil_lines=affil_lines,
     abstract=runs(abstract),

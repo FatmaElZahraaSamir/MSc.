@@ -11,10 +11,30 @@ at `\scriptsize`, float separation is reduced in the preamble, and the prompt
 template sits inline in Section III-E rather than as a captioned float. Adding a
 paragraph will usually push the last references onto a ninth page.
 
+## Which file goes where
+
+ICCI 2026 reviews double-blind and asks for the PDF *and* the Word source:
+
+| File | Use |
+|---|---|
+| `paper-submission.pdf` + `paper-submission.docx` | **upload both to CMT** — no author information anywhere |
+| `paper-camera-ready.pdf` + `paper-camera-ready.docx` | after acceptance — carries the author block |
+
+`main.tex` produces either. `\anonymoustrue` (the committed state) withholds the
+author block and defers the availability claim; `\anonymousfalse` restores both.
+Rebuild the `.docx` after flipping it — `tex2docx_content.py` reads the switch
+out of `main.tex`, so the two formats cannot disagree.
+
+Checked on `paper-submission.*`: no author name, affiliation or address appears
+in the text, the PDF metadata or anywhere in the `.docx` package; all fonts are
+embedded subsets. Nothing in the bibliography cites the authors' own work.
+
 ## Conference format
 
 ICCI 2026 requires the standard IEEE conference template, and the template it
-ships is the **A4** variant. Both deliverables follow it:
+ships is the **A4** variant. Submission is through Microsoft CMT
+(`cmt3.research.microsoft.com/ICCIFUE2026`); accepted papers go to IEEE Xplore,
+and the format can be pre-checked with IEEE PDF eXpress. Both deliverables follow it:
 
 | | `main.tex` / `main.pdf` | `paper-revised.docx` |
 |---|---|---|

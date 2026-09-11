@@ -197,18 +197,24 @@ front.push(new Paragraph({
   children: [new TextRun({ text: doc.title, font: FONT, size: 48 })],
   alignment: AlignmentType.CENTER, spacing: { after: 220, line: 300 },
 }));
-front.push(new Paragraph({
-  children: [new TextRun({ text: doc.authors, font: FONT, size: 22 })],
-  alignment: AlignmentType.CENTER, spacing: { after: 40, line: 240 },
-}));
-doc.affil_lines.forEach((line, i) => {
-  const last = i === doc.affil_lines.length - 1;
+// Under double-blind review the whole author block is withheld; the title then
+// runs straight into the abstract, exactly as the LaTeX build does.
+if (doc.anonymous) {
+  front.push(new Paragraph({ text: '', spacing: { after: 240 } }));
+} else {
   front.push(new Paragraph({
-    children: line.map((x) => r(x, BODY)),
-    alignment: AlignmentType.CENTER,
-    spacing: { after: last ? 240 : 20, line: 230 },
+    children: [new TextRun({ text: doc.authors, font: FONT, size: 22 })],
+    alignment: AlignmentType.CENTER, spacing: { after: 40, line: 240 },
   }));
-});
+  doc.affil_lines.forEach((line, i) => {
+    const last = i === doc.affil_lines.length - 1;
+    front.push(new Paragraph({
+      children: line.map((x) => r(x, BODY)),
+      alignment: AlignmentType.CENTER,
+      spacing: { after: last ? 240 : 20, line: 230 },
+    }));
+  });
+}
 front.push(new Paragraph({
   children: [new TextRun({ text: 'Abstract—', bold: true, italics: true, font: FONT, size: 18 })]
     .concat(doc.abstract.map((x) => new TextRun({
