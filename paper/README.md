@@ -1,13 +1,38 @@
 # Paper — *Large Language Models for Software Requirements Classification: Cross-Dataset Generalization and Cost-Efficiency*
 
-An 8-page IEEE conference paper built directly from the seven-stage pipeline in
-the repository root. Every number in the paper is read back from a stored
+An 8-page IEEE conference paper, formatted for **ICCI 2026** (7th International
+Conference on Computing and Informatics, Future University in Egypt, Cairo,
+19-20 December 2026), built directly from the seven-stage pipeline in the
+repository root. Every number in the paper is read back from a stored
 artefact; nothing is transcribed by hand.
 
 The 8-page limit is tight and the layout is tuned to it: Tables I and II are set
 at `\scriptsize`, float separation is reduced in the preamble, and the prompt
 template sits inline in Section III-E rather than as a captioned float. Adding a
 paragraph will usually push the last references onto a ninth page.
+
+## Conference format
+
+ICCI 2026 requires the standard IEEE conference template, and the template it
+ships is the **A4** variant. Both deliverables follow it:
+
+| | `main.tex` / `main.pdf` | `paper-revised.docx` |
+|---|---|---|
+| class / geometry | `IEEEtran` with `conference,a4paper` | the template's own A4 block: 54pt top, 45.35pt sides, 72pt bottom, two columns 18pt apart |
+| keyword label | `\IEEEkeywordsname` set to `Keywords` | `Keywords—` |
+| first-page footer | `\IEEEpubid` with the template placeholder | same, in a first-page footer |
+| author block | names / dept. / organization / city, country / contact | same lines |
+
+The two differ by about 2% in text width: `IEEEtran`'s A4 block is 516pt wide
+with a 12pt column gap, the Word template's is 504.58pt with an 18pt gap. Both
+are IEEE's own templates and either is accepted; the `.docx` is the exact one
+ICCI distributed.
+
+The copyright identifier (`XXX-X-XXXX-XXXX-X/XX/$XX.00 ©20XX IEEE`) is the
+template's placeholder. IEEE assigns the real one at camera-ready.
+
+All 26 fonts in `main.pdf` are embedded subsets, which is what IEEE PDF eXpress
+checks.
 
 ## Build
 

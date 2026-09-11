@@ -373,15 +373,18 @@ for kind, chunk in pieces:
 
 # ----------------------------------------------------------------- front
 front = tex[:tex.index('\\section{Introduction}')]
-title = re.search(r'\\title\{(.*?)\}\s*\n\s*\\author', front, re.S).group(1)
+title = re.search(r'\\title\{(.*?)\}\s*\n(?:\s*%[^\n]*\n)*\s*\\author', front, re.S).group(1)
 abstract = re.search(r'\\begin\{abstract\}(.*?)\\end\{abstract\}', front, re.S).group(1)
 kw = re.search(r'\\begin\{IEEEkeywords\}(.*?)\\end\{IEEEkeywords\}', front, re.S).group(1)
 
+names = re.search(r'\\IEEEauthorblockN\{(.*?)\}', front, re.S).group(1)
+block = re.search(r'\\IEEEauthorblockA\{(.*?)\}\}', front, re.S).group(1)
+affil_lines = [runs(x) for x in block.split('\\\\') if clean(x).strip()]
+
 doc = dict(
     title=clean(title.replace('\\\\', ' ')),
-    authors='Fatma El-Zahraa Samir, Khaled T. Wassif, and Lamia AbouZeid',
-    affil='Faculty of Computers and Artificial Intelligence, Cairo University, Giza, Egypt',
-    email='fatmaelzahraasamirabdelfattah@gmail.com',
+    authors=clean(names),
+    affil_lines=affil_lines,
     abstract=runs(abstract),
     keywords=clean(kw),
     blocks=blocks,

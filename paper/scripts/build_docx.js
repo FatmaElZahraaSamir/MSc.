@@ -6,7 +6,7 @@ const D = require('docx');
 const {
   Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell,
   AlignmentType, HeadingLevel, WidthType, BorderStyle, ShadingType,
-  PageOrientation, SectionType, convertInchesToTwip,
+  PageOrientation, SectionType, Footer, convertInchesToTwip,
 } = D;
 
 const doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'paper.json'), 'utf8'));
@@ -20,12 +20,22 @@ const NONE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
 const NOBORD = { top: NONE, bottom: NONE, left: NONE, right: NONE };
 const HAIR = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
 
-// Column geometry: Letter, 0.75in top/bottom, 0.625in sides, 0.25in gutter.
-const PAGE_W = 12240, PAGE_H = 15840;
-const MARGIN = { top: 1080, bottom: 1080, left: 900, right: 900, gutter: 0 };
-const TEXT_W = PAGE_W - MARGIN.left - MARGIN.right;   // 10440 dxa
-const GUTTER = 360;
-const COL_W = Math.floor((TEXT_W - GUTTER) / 2);      // 5040 dxa
+// Geometry copied from the ICCI 2026 IEEE conference template (A4 variant):
+// page 595.30 x 841.90 pt, body margins top 54pt / sides 45.35pt / bottom 72pt,
+// header and footer 36pt, two columns 18pt apart. Word measures in twips.
+const PT = 20;
+const PAGE_W = Math.round(595.30 * PT), PAGE_H = Math.round(841.90 * PT);
+const SIDE = Math.round(45.35 * PT);
+const MARGIN = {
+  top: Math.round(54 * PT), bottom: Math.round(72 * PT),
+  left: SIDE, right: SIDE,
+  header: Math.round(36 * PT), footer: Math.round(36 * PT), gutter: 0,
+};
+// The template opens the title block higher up the page than the body.
+const MARGIN_TITLE = Object.assign({}, MARGIN, { top: Math.round(27 * PT) });
+const TEXT_W = PAGE_W - MARGIN.left - MARGIN.right;
+const GUTTER = Math.round(18 * PT);
+const COL_W = Math.floor((TEXT_W - GUTTER) / 2);
 
 const r = (o, size = BODY) => new TextRun({
   text: o.text, bold: !!o.bold, italics: !!o.italic,
@@ -169,15 +179,36 @@ function promptBox(colWidth) {
   return box;
 }
 
+// The template's first-page footer. IEEE assigns the identifier at
+// camera-ready; the X's are the template's own placeholder.
+const copyrightFooter = new Footer({
+  children: [new Paragraph({
+    children: [new TextRun({
+      text: 'XXX-X-XXXX-XXXX-X/XX/$XX.00 \u00a920XX IEEE',
+      font: FONT, size: SMALL,
+    })],
+    alignment: AlignmentType.LEFT,
+  })],
+});
+
 // ------------------------------------------------------------- assembly
 const front = [];
 front.push(new Paragraph({
   children: [new TextRun({ text: doc.title, font: FONT, size: 48 })],
   alignment: AlignmentType.CENTER, spacing: { after: 220, line: 300 },
 }));
-front.push(txt(doc.authors, { align: AlignmentType.CENTER, after: 40 }));
-front.push(txt(doc.affil, { align: AlignmentType.CENTER, italic: true, after: 40 }));
-front.push(txt(doc.email, { align: AlignmentType.CENTER, after: 240 }));
+front.push(new Paragraph({
+  children: [new TextRun({ text: doc.authors, font: FONT, size: 22 })],
+  alignment: AlignmentType.CENTER, spacing: { after: 40, line: 240 },
+}));
+doc.affil_lines.forEach((line, i) => {
+  const last = i === doc.affil_lines.length - 1;
+  front.push(new Paragraph({
+    children: line.map((x) => r(x, BODY)),
+    alignment: AlignmentType.CENTER,
+    spacing: { after: last ? 240 : 20, line: 230 },
+  }));
+});
 front.push(new Paragraph({
   children: [new TextRun({ text: 'Abstract—', bold: true, italics: true, font: FONT, size: 18 })]
     .concat(doc.abstract.map((x) => new TextRun({
@@ -196,9 +227,11 @@ const sections = [];
 sections.push({
   properties: {
     type: SectionType.CONTINUOUS,
-    page: { size: { width: PAGE_W, height: PAGE_H }, margin: MARGIN },
+    page: { size: { width: PAGE_W, height: PAGE_H }, margin: MARGIN_TITLE },
     column: { count: 1 },
+    titlePage: true,
   },
+  footers: { first: copyrightFooter },
   children: front,
 });
 
