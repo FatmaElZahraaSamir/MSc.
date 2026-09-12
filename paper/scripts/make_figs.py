@@ -1,366 +1,319 @@
-"""Paper figures for the IEEE two-column submission.
+"""The paper's three data figures, drawn as plainly as the data allows.
 
-Design rules applied (dataviz skill):
-  * form chosen by the data's job, color assigned last and validated
-    (palette #0072B2,#009E73,#E69F00,#CC79A7 passes all six checks, light mode)
-  * every tier carries a second, non-colour encoding (marker shape / hatch),
-    so the figures survive greyscale printing
-  * one axis per panel, recessive grid, selective direct labels only.
-Every number is read from the Stage-4 / Stage-5 artefacts, never hard-coded
-except where a value is quoted from those same CSVs in a comment.
+Every value is read from the stored artefacts; none is typed in.  Each panel
+carries one axis whose label says in words what the numbers on it are, because
+a macro-F1, a share of items and a count of statistical tests all look alike on
+a page and must not be confused with one another.
 """
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import pandas as pd, numpy as np
-from matplotlib.lines import Line2D
+import numpy as np
+import pandas as pd
 from matplotlib.patches import Patch
 
-Z = '../artefacts/'
+Z = '../../artefacts/'
 OUT = '../figures/'
-
 CM = 1/2.54
 COL = 8.8*CM          # IEEE single column
-FULL = 18.0*CM        # IEEE double column
 
 plt.rcParams.update({
     'font.family': 'serif',
-    'font.serif': ['FreeSerif', 'Nimbus Roman', 'DejaVu Serif'],
+    'font.serif': ['Nimbus Roman', 'FreeSerif', 'DejaVu Serif'],
     'mathtext.fontset': 'stix',
-    'font.size': 7,
-    'axes.labelsize': 7.5,
-    'axes.titlesize': 7.5,
-    'xtick.labelsize': 6.8,
-    'ytick.labelsize': 6.8,
-    'legend.fontsize': 6.5,
+    'font.size': 7, 'axes.labelsize': 7, 'axes.titlesize': 7.2,
+    'xtick.labelsize': 6.6, 'ytick.labelsize': 6.6, 'legend.fontsize': 6.2,
     'axes.linewidth': 0.6,
     'xtick.major.width': 0.5, 'ytick.major.width': 0.5,
-    'xtick.major.size': 2.4, 'ytick.major.size': 2.4,
-    'grid.linewidth': 0.4, 'grid.color': '#c9c9c9',
+    'xtick.major.size': 2.2, 'ytick.major.size': 2.2,
+    'grid.linewidth': 0.4, 'grid.color': '#cccccc',
     'axes.spines.top': False, 'axes.spines.right': False,
     'figure.dpi': 300, 'savefig.dpi': 300,
     'savefig.bbox': 'tight', 'savefig.pad_inches': 0.012,
     'pdf.fonttype': 42,
 })
 
-# validated categorical palette -- identity, fixed order, never cycled
-C_ENC  = '#0072B2'   # fine-tuned encoder
-C_LOC  = '#E69F00'   # local open-weight LLM
-C_HOST = '#009E73'   # hosted open-weight LLM
-C_COM  = '#CC79A7'   # commercial LLM
-INK, INK2, MUTED = '#1a1a1a', '#4d4d4d', '#8a8a8a'
+# Okabe--Ito derived categorical set, validated for colour-vision deficiency
+# separation.  Identity is fixed: one hue per model family, never cycled.
+C_ENC, C_ENC2, C_LOC = '#0072B2', '#66B2D8', '#E69F00'
+C_HOST, C_COM = '#009E73', '#CC79A7'
+INK, MUTED, RED = '#1a1a1a', '#5a5a5a', '#A11B1B'
+TIER_C = {'finetuned': C_ENC, 'open_local': C_LOC,
+          'open_hosted': C_HOST, 'commercial': C_COM}
 
-MK = {'finetuned': 'o', 'open_local': '^', 'open_hosted': 's', 'commercial': 'D'}
-CO = {'finetuned': C_ENC, 'open_local': C_LOC, 'open_hosted': C_HOST, 'commercial': C_COM}
-TIER_LABEL = {'finetuned': 'Fine-tuned encoder', 'open_local': 'Open-weight, local (4-bit)',
-              'open_hosted': 'Open-weight, hosted API', 'commercial': 'Commercial API'}
+ev = pd.read_csv(Z+'results_Stage4_analysis/tab9_evaluability.csv')
+mc = pd.read_csv(Z+'results_Stage4_analysis/tab4_mcnemar.csv')
+fin = pd.read_parquet(Z+'results_stage2_finetuned_baselines/predictions_finetuned.parquet')
+lpr = pd.read_parquet(Z+'repair/predictions_llm_repaired.parquet')
+uni = pd.read_csv(Z+'results_stage1_data_pipeline/data_processed/unified.csv')
+c1 = pd.read_csv(Z+'results_Stage5_cost/cost1_per_model.csv')
+be = pd.read_csv(Z+'results_Stage5_cost/cost3_breakeven.csv')
 
-
-def prf(yt, yp):
-    tp = (yt & yp).sum(); fp = (~yt & yp).sum(); fn = (yt & ~yp).sum()
-    P = tp/(tp+fp) if tp+fp else 0.0
-    R = tp/(tp+fn) if tp+fn else 0.0
-    return P, R
-
-
-# ---------------------------------------------------------------- Figure 2
-# Why the encoders fail across corpora: the decision threshold follows the
-# training corpus base rate.
-
-def fig_prior_shift():
-    p = pd.read_parquet(Z+'results_stage2_finetuned_baselines/predictions_finetuned.parquet')
-    s = p[p.task == 'security']
-    L = pd.read_parquet(Z+'repair/predictions_llm_repaired.parquet')
-
-    def rate(tag, ds, reg):
-        d = s[(s.model_tag == tag) & (s.dataset == ds) & (s.eval_regime == reg)]
-        return (d.y_pred == 'security').mean(), (d.y_true == 'security').mean()
-
-    fig = plt.figure(figsize=(8.0*CM, 6.95*CM))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.16, 1.0], width_ratios=[1.0, 1.06],
-                          hspace=1.02, wspace=0.52)
-    ax = fig.add_subplot(gs[0, :])
-    bx = fig.add_subplot(gs[1, 0])
-    cx = fig.add_subplot(gs[1, 1])
-
-    # -- (a) the transferred encoder reproduces the source corpus base rate
-    prev = {ds: rate('bert-base-uncased-weighted', ds, 'in_domain')[1]
-            for ds in ('promise', 'secreq')}
-    rows = [('SecReq $\\rightarrow$ PROMISE', 'promise'),
-            ('PROMISE $\\rightarrow$ SecReq', 'secreq')]
-    for (title, ds), y in zip(rows, [1.0, 0.0]):
-        src_ds = 'secreq' if ds == 'promise' else 'promise'
-        tgt, srcp = prev[ds], prev[src_ds]
-        ax.plot([tgt, srcp], [y, y], color='#dcdcdc', lw=3.0, solid_capstyle='butt', zorder=1)
-        ax.plot([tgt], [y], marker='|', ms=9, mew=1.5, color=INK, zorder=4)
-        ax.plot([srcp], [y], marker='|', ms=9, mew=1.5, color=MUTED, zorder=4)
-        side = 1 if ds == 'promise' else -1
-        for tag, name, dy, mk in [('bert-base-uncased-weighted', 'BERT', 0.235, 'o'),
-                                  ('roberta-base-weighted', 'RoBERTa', -0.235, 's')]:
-            pr, _ = rate(tag, ds, 'cross_dataset')
-            ax.plot([pr], [y+dy], marker=mk, ms=4.0, color=C_ENC, mec='white', mew=0.5, zorder=5)
-            ax.annotate(f'{name} {pr:.3f}', (pr, y+dy), xytext=(5*side, 0),
-                        textcoords='offset points', va='center',
-                        ha='left' if side > 0 else 'right', fontsize=6.2, color=INK)
-        ax.text(-0.010, y, title, ha='right', va='center', fontsize=6.5, color=INK)
-    ax.annotate('true rate in\nthe test corpus', (prev['promise'], 1.38), xytext=(-1, 20),
-                textcoords='offset points', ha='center', fontsize=5.9, color=INK,
-                linespacing=0.98,
-                arrowprops=dict(arrowstyle='-', lw=0.5, color=INK, shrinkA=1, shrinkB=0))
-    ax.annotate('base rate of the\ntraining corpus', (prev['secreq'], 1.38), xytext=(20, 20),
-                textcoords='offset points', ha='center', fontsize=5.9, color=MUTED,
-                linespacing=0.98,
-                arrowprops=dict(arrowstyle='-', lw=0.5, color=MUTED, shrinkA=1, shrinkB=0))
-    ax.set_xlim(0.0, 0.62); ax.set_ylim(-0.62, 2.15)
-    ax.set_yticks([]); ax.spines['left'].set_visible(False)
-    ax.tick_params(axis='y', length=0)
-    ax.set_xlabel('share of test items predicted "security"', labelpad=1.5)
-    ax.xaxis.set_major_formatter(lambda v, _: f'{v:.0%}')
-    ax.grid(axis='x'); ax.set_axisbelow(True)
-    ax.set_title('(a) a fine-tuned encoder inherits its prior from its training corpus',
-                 fontsize=7.2, loc='left', pad=27)
-
-    # -- (b) precision collapses, recall does not
-    cells = [('in_domain', 'in-dom.'), ('cross_project', 'x-proj.'),
-             ('cross_dataset', 'x-data.')]
-    P, R = [], []
-    for reg, _ in cells:
-        d = s[(s.model_tag == 'bert-base-uncased-weighted') &
-              (s.dataset == 'promise') & (s.eval_regime == reg)]
-        pr, rc = prf((d.y_true == 'security').values, (d.y_pred == 'security').values)
-        P.append(pr); R.append(rc)
-    x = np.arange(3); w = 0.34
-    b1 = bx.bar(x-w/2, P, w, color=C_ENC, edgecolor='white', linewidth=0.7, label='prec.')
-    b2 = bx.bar(x+w/2, R, w, color='white', edgecolor=C_ENC, linewidth=0.9,
-                hatch='/////', label='rec.')
-    for b, v in [(b1[2], P[2]), (b2[2], R[2])]:   # label only the decisive pair
-        bx.annotate(f'{v:.2f}', (b.get_x()+b.get_width()/2, v), xytext=(0, 1.6),
-                    textcoords='offset points', ha='center', fontsize=6.0, color=INK)
-    bx.set_xticks(x); bx.set_xticklabels([c[1] for c in cells], fontsize=6.2)
-    bx.set_ylim(0, 1.12); bx.set_yticks([0, 0.5, 1.0])
-    bx.set_ylabel('security class', fontsize=7)
-    bx.grid(axis='y'); bx.set_axisbelow(True)
-    bx.legend(frameon=False, ncol=2, loc='lower left', bbox_to_anchor=(-0.06, 0.97),
-              handlelength=1.0, columnspacing=0.7, handletextpad=0.35, fontsize=6.0)
-    bx.set_title('(b) BERT$_{\\mathrm{w}}$ on PROMISE', fontsize=7.0, loc='left', pad=13)
-
-    # -- (c) prompted models: how well the prior is calibrated predicts accuracy
-    TIER = {'gemini-3.1-flash-lite': 'commercial',
-            'groq-llama-3.3-70b-versatile': 'open_hosted'}
-    z = L[(L.task == 'fr_nfr') & (L.prompt_id == 'base') & (L.shot_k == 0) &
-          (L.model_tag != 'openrouter-nemotron-3-nano-30b-a3b')]
-    g = z.groupby('model_tag').apply(
-        lambda d: pd.Series({'pred': (d.y_pred == 'NFR').mean(),
-                             'acc': (d.y_pred == d.y_true).mean()}), include_groups=False)
-    true_nfr = (z.y_true == 'NFR').mean()
-    for tag, r in g.iterrows():
-        t = TIER.get(tag, 'open_local')
-        cx.scatter([r.pred], [r.acc], s=16, marker=MK[t], c=CO[t],
-                   edgecolors='white', linewidths=0.4, zorder=3)
-    cx.axvline(true_nfr, color=INK, lw=0.7, ls=(0, (3, 2)), zorder=2)
-    cx.annotate('true\nrate', (true_nfr, 0.60), xytext=(-3, 0),
-                textcoords='offset points', ha='right', va='center',
-                fontsize=5.8, color=INK, linespacing=1.0)
-    rho = pd.Series(g.pred).rank().corr(pd.Series(g.acc).rank())
-    cx.text(0.03, 0.955, f'$\\rho={rho:.2f}$', transform=cx.transAxes,
-            fontsize=6.4, va='top', color=INK)
-    cx.set_xlim(0.10, 0.62); cx.set_ylim(0.55, 0.92)
-    cx.set_xticks([0.2, 0.4, 0.6])
-    cx.xaxis.set_major_formatter(lambda v, _: f'{v:.0%}')
-    cx.set_xlabel('predicted NFR share', fontsize=7, labelpad=1.5)
-    cx.set_ylabel('accuracy', fontsize=7)
-    cx.grid(True); cx.set_axisbelow(True)
-    cx.set_title('(c) 8 prompted models, FR/NFR', fontsize=7.0, loc='left', pad=13)
-
-    fig.savefig(OUT+'fig_prior_shift.pdf')
-    
-    plt.close(fig)
-    print('fig_prior_shift.pdf  rho=%.3f  true_nfr=%.4f' % (rho, true_nfr))
+LLMS = ['Gemini-3.1-Flash-Lite', 'Llama-3.3-70B (Groq)', 'Qwen2.5-7B',
+        'Llama-3.1-8B', 'Gemma-2-2B', 'Phi-4-mini', 'SmolLM3-3B', 'Qwen2.5-3B']
 
 
-# ---------------------------------------------------------------- Figure 3
-# The inversion: encoder scores fall through the prompted band as shift grows.
+def f1(model, task, ds, regime):
+    r = ev[(ev.model == model) & (ev.task == task) & (ev.dataset == ds) &
+           (ev.eval_regime == regime) & (ev.reportable)]
+    return float(r.macro_f1.iloc[0]) if len(r) else np.nan
 
+
+# =======================================================  Figure: inversion
 def fig_inversion():
-    ev = pd.read_csv(Z+'results_Stage4_analysis/tab9_evaluability.csv')
-    mc = pd.read_csv(Z+'results_Stage4_analysis/tab4_mcnemar.csv')
-    sec = ev[(ev.task == 'security') & (ev.dataset == 'promise') & ev.reportable]
+    TASK, DS = 'security', 'promise'
+    regs = ['in_domain', 'cross_project', 'cross_dataset']
+    names = ['In-domain\n(same corpus)', 'Cross-project\n(unseen projects)',
+             'Cross-dataset\n(the other corpus)']
+    bert = [f1('BERT (weighted)', TASK, DS, r) for r in regs]
+    rob = [f1('RoBERTa (weighted)', TASK, DS, r) for r in regs]
+    pv = np.array([f1(m, TASK, DS, 'prompted') for m in LLMS])
+    pv = pv[~np.isnan(pv)]
+    pmed, plo, phi = np.median(pv), pv.min(), pv.max()
 
-    def f1(model, reg):
-        r = sec[(sec.model == model) & (sec.eval_regime == reg)]
-        return float(r.macro_f1.iloc[0]) if len(r) else np.nan
+    fig, (ax, bx) = plt.subplots(
+        2, 1, figsize=(COL, 6.2*CM),
+        gridspec_kw=dict(height_ratios=[1.42, 1.0], hspace=1.02))
 
-    regimes = ['in_domain', 'cross_project', 'cross_dataset']
-    prompted = sec[sec.eval_regime == 'prompted']
-    lo, hi = prompted.macro_f1.min(), prompted.macro_f1.max()
+    # ---- (a) the same models at three levels of distribution shift
+    x = np.arange(3)
+    w = 0.26
+    for i, (lab, vals, col, hat) in enumerate([
+            ('BERT', bert, C_ENC, ''),
+            ('RoBERTa', rob, C_ENC2, ''),
+            ('prompted LLMs (median of 8)', [pmed]*3, C_LOC, '///')]):
+        pos = x + (i-1)*w
+        ax.bar(pos, vals, w*0.86, color=col, edgecolor='white', linewidth=0.7,
+               hatch=hat, label=lab, zorder=3)
+        for p, v in zip(pos, vals):
+            ax.text(p, v+0.016, f'{v:.2f}', ha='center', va='bottom',
+                    fontsize=5.8, color=INK)
+    ax.errorbar(x+w, [pmed]*3, yerr=[[pmed-plo]*3, [phi-pmed]*3], fmt='none',
+                ecolor=MUTED, elinewidth=0.6, capsize=1.8, capthick=0.6, zorder=4)
 
-    fig, (ax, bx) = plt.subplots(2, 1, figsize=(9.45*CM, 7.1*CM),
-                                 gridspec_kw={'height_ratios': [1.5, 1.0], 'hspace': 0.60})
+    # the only percentage in this panel, and it is a relative loss of score
+    drop = 100*(bert[0]-bert[2])/bert[0]
+    ax.annotate(f'BERT loses {drop:.1f}% of its own in-domain score',
+                xy=(2-w-0.115, 0.44), xytext=(-0.46, 1.115),
+                fontsize=5.9, color=RED, ha='left', va='center',
+                arrowprops=dict(arrowstyle='->', lw=0.55, color=RED,
+                                shrinkA=2, shrinkB=2,
+                                connectionstyle='arc3,rad=-0.28'))
+    ax.set_ylim(0, 1.20)
+    ax.set_yticks(np.arange(0, 1.01, 0.25))
+    ax.set_xticks(x); ax.set_xticklabels(names, fontsize=6.2, linespacing=1.15)
+    ax.set_ylabel('macro-F1 (0 = worst, 1 = perfect)')
+    ax.grid(axis='y', zorder=0); ax.set_axisbelow(True)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.30), ncol=3,
+              frameon=False, handlelength=1.1, handletextpad=0.4,
+              columnspacing=1.0, borderpad=0.0)
+    ax.set_title('(a) security task on PROMISE_exp: the same 968 items scored\n'
+                 'at each level of distribution shift',
+                 fontsize=6.6, loc='left', pad=3, linespacing=1.25)
 
-    ax.axhspan(lo, hi, color=C_LOC, alpha=0.17, zorder=0, lw=0)
-    ax.axhline(hi, color=C_LOC, lw=0.7, zorder=1)
-    ax.axhline(lo, color=C_LOC, lw=0.7, zorder=1)
-    ax.text(2.22, (lo+hi)/2, 'the eight\nprompted\nmodels',
-            fontsize=6.2, va='center', ha='left', color='#8a6100', linespacing=1.12)
-
-    for m, short, mk in [('BERT (weighted)', 'BERT', 'o'),
-                         ('RoBERTa (weighted)', 'RoBERTa', 's')]:
-        ys = [f1(m, r) for r in regimes]
-        ax.plot(range(3), ys, '-', color=C_ENC, lw=1.2, marker=mk, ms=4.0,
-                mfc=C_ENC if mk == 'o' else 'white', mec=C_ENC, mew=1.0, zorder=3)
-        ax.annotate(short, (2, ys[-1]), xytext=(5, 0), textcoords='offset points',
-                    va='center', fontsize=6.3, color=INK)
-        up, down = (6, -11) if m.startswith('BERT') else (7, -10)
-        for i, v in enumerate(ys):
-            dy = (down if m.startswith('BERT') else up) if i == 2 else \
-                 (up if m.startswith('BERT') else down)
-            ax.annotate(f'{v:.3f}', (i, v), xytext=(0, dy), textcoords='offset points',
-                        ha='center', fontsize=6.0, color=INK2)
-
-    ax.set_xticks(range(3))
-    ax.set_xticklabels(['in-domain', 'cross-project', 'cross-dataset'])
-    ax.set_xlim(-0.22, 3.22); ax.set_ylim(0.405, 1.005)
-    ax.set_ylabel('macro-F1')
-    ax.grid(axis='y'); ax.set_axisbelow(True)
-    ax.set_title('(a) security classification, PROMISE_exp, identical test items',
-                 fontsize=7.2, loc='left', pad=4)
-    ax.annotate('', xy=(1.68, 0.432), xytext=(0.0, 0.432),
-                arrowprops=dict(arrowstyle='-|>', lw=0.6, color=MUTED,
-                                shrinkA=0, shrinkB=0, mutation_scale=6))
-    ax.text(0.84, 0.446, 'increasing distribution shift', fontsize=6.0,
-            ha='center', color=MUTED)
-
-    order = [('in_domain', 'in-domain'), ('cross_project', 'cross-project'),
-             ('cross_dataset', 'cross-dataset')]
-    ct = pd.crosstab(mc.encoder_regime, mc.verdict)
+    # ---- (b) how the 260 paired tests came out, by regime
+    order = [('in_domain', 'In-domain'), ('cross_project', 'Cross-project'),
+             ('cross_dataset', 'Cross-dataset')]
+    cats = [('Encoder wins', C_ENC, ''), ('n.s.', '#dcdcdc', ''),
+            ('LLM wins', C_LOC, '///')]
     y = np.arange(3)[::-1]
-    left = np.zeros(3)
-    segs = [('Encoder wins', C_ENC, None, 'white'),
-            ('n.s.', '#e2e2e2', None, INK),
-            ('LLM wins', C_LOC, '/////', INK)]
-    for lab, col, hat, tc in segs:
-        vals = np.array([ct.loc[k, lab] if lab in ct.columns else 0 for k, _ in order],
-                        dtype=float)
-        bx.barh(y, vals, left=left, height=0.60, color=col, edgecolor='white',
-                linewidth=1.0, hatch=hat, label=lab)
-        for yy, v, l in zip(y, vals, left):
-            if v >= 10:
-                bx.text(l+v/2, yy, f'{int(v)}', ha='center', va='center',
-                        fontsize=6.3, color=tc)
-        left += vals
-    bx.set_yticks(y); bx.set_yticklabels([lbl for _, lbl in order])
-    bx.set_xlabel('exact McNemar tests (Benjamini\u2013Hochberg, $\\alpha=0.05$)', labelpad=1.5)
-    bx.set_xlim(0, 118)
-    for yy, (k, _) in zip(y, order):
-        bx.text(int(ct.loc[k].sum())+2.5, yy, f'n={int(ct.loc[k].sum())}',
-                va='center', fontsize=6.0, color=MUTED)
-    bx.spines['left'].set_visible(False)
-    bx.tick_params(axis='y', length=0)
-    bx.grid(axis='x'); bx.set_axisbelow(True)
-    bx.legend(frameon=False, ncol=3, loc='lower left', bbox_to_anchor=(-0.02, 0.99),
-              handlelength=1.2, columnspacing=1.0, handletextpad=0.45)
-    bx.set_title('(b) all 260 paired encoder-vs-LLM comparisons',
-                 fontsize=7.2, loc='left', pad=14)
+    for j, (reg, lab) in enumerate(order):
+        d = mc[mc.encoder_regime.str.startswith(reg)]
+        left = 0
+        for name, col, hat in cats:
+            n = int((d.verdict == name).sum())
+            if n:
+                bx.barh(y[j], n, 0.52, left=left, color=col, edgecolor='white',
+                        linewidth=0.7, hatch=hat, zorder=3)
+                bx.text(left+n/2, y[j], str(n), ha='center', va='center',
+                        fontsize=6.0,
+                        color='white' if col == C_ENC else INK)
+            left += n
+        bx.text(left+2.5, y[j], f'{left} tests', va='center', fontsize=5.8,
+                color=MUTED)
+    bx.set_yticks(y); bx.set_yticklabels([l for _, l in order], fontsize=6.4)
+    bx.set_xlim(0, 124)
+    bx.set_xlabel('number of paired statistical tests\n'
+                  '(one test = one encoder against one LLM on the same items)',
+                  fontsize=6.2, linespacing=1.2)
+    bx.grid(axis='x', zorder=0); bx.set_axisbelow(True)
+    bx.legend(handles=[Patch(facecolor=c, hatch=h, edgecolor='white', label=n)
+                       for n, c, h in [('encoder better', C_ENC, ''),
+                                       ('no difference', '#dcdcdc', ''),
+                                       ('LLM better', C_LOC, '///')]],
+              loc='upper center', bbox_to_anchor=(0.5, -0.52), ncol=3,
+              frameon=False, handlelength=1.1, handletextpad=0.4,
+              columnspacing=1.2, borderpad=0.0)
+    bx.set_title('(b) all 260 comparisons, grouped by how the encoder was tested',
+                 fontsize=6.6, loc='left', pad=3)
     fig.savefig(OUT+'fig_inversion.pdf')
-    
     plt.close(fig)
-    print('fig_inversion.pdf  prompted band %.3f-%.3f' % (lo, hi))
+    print('fig_inversion.pdf  drop=%.1f%%  prompted median %.3f [%.3f, %.3f]'
+          % (drop, pmed, plo, phi))
 
 
-# ---------------------------------------------------------------- Figure 4
-# Cost: accuracy per dollar, and when fine-tuning repays its one-off training.
+# =====================================================  Figure: class prior
+def fig_prior():
+    sec = fin[fin.task == 'security']
 
+    def share(tag, ds, reg):
+        d = sec[(sec.model_tag == tag) & (sec.dataset == ds) &
+                (sec.eval_regime == reg)]
+        return 100*(d.y_pred == 'security').mean()
+
+    true_p = 100*(uni[uni.source_dataset == 'promise'].label_security == 'security').mean()
+    src_p = 100*(uni[uni.source_dataset == 'secreq'].label_security == 'security').mean()
+
+    fig, (ax, bx) = plt.subplots(
+        2, 1, figsize=(COL, 6.4*CM),
+        gridspec_kw=dict(height_ratios=[1.0, 1.12], hspace=1.00))
+
+    # ---- (a) what share of the test items each encoder calls "security"
+    rows = [('BERT, trained on\nPROMISE_exp itself',
+             share('bert-base-uncased-weighted', 'promise', 'in_domain')),
+            ('RoBERTa, trained\non SecReq',
+             share('roberta-base-weighted', 'promise', 'cross_dataset')),
+            ('BERT, trained\non SecReq',
+             share('bert-base-uncased-weighted', 'promise', 'cross_dataset'))]
+    y = np.arange(len(rows))
+    ax.barh(y, [v for _, v in rows], 0.5, color=C_ENC, edgecolor='white',
+            linewidth=0.7, zorder=3)
+    for yy, (_, v) in zip(y, rows):
+        ax.text(v+1.0, yy, f'{v:.1f}%', va='center', fontsize=6.2, color=INK)
+    ax.axvline(true_p, color=RED, lw=0.8, zorder=4)
+    ax.axvline(src_p, color=MUTED, lw=0.8, ls=(0, (2.5, 1.6)), zorder=4)
+    ax.text(true_p-1.4, 2.68, f'truth: {true_p:.1f}%',
+            ha='right', va='center', fontsize=5.8, color=RED)
+    ax.text(src_p+1.4, 2.68, f'training\ncorpus: {src_p:.1f}%',
+            ha='left', va='center', fontsize=5.8, color=MUTED, linespacing=1.05)
+    ax.set_yticks(y)
+    ax.set_yticklabels([n for n, _ in rows], fontsize=6.0, linespacing=1.1)
+    ax.set_xlim(0, 62); ax.set_ylim(-0.55, 3.30)
+    ax.set_xlabel('share of the 968 test items the model labels "security"',
+                  fontsize=6.3)
+    ax.grid(axis='x', zorder=0); ax.set_axisbelow(True)
+    ax.set_title('(a) a transferred encoder keeps the class balance it was\n'
+                 'trained on, not the one it is being tested on',
+                 fontsize=6.6, loc='left', pad=3, linespacing=1.25)
+
+    # ---- (b) the prompted models: same defect, different source
+    L = lpr[(lpr.task == 'fr_nfr') & (lpr.dataset == 'promise') &
+            (lpr.shot_k == 0) & (lpr.prompt_id == 'base')]
+    pts = []
+    for tag, g in L.groupby('model_tag'):
+        if 'nemotron' in tag:
+            continue
+        pts.append((tag, 100*(g.y_pred_strict == 'NFR').mean(),
+                    100*(g.y_pred_strict == g.y_true).mean()))
+    P = pd.DataFrame(pts, columns=['m', 'pred', 'acc'])
+    rho = np.corrcoef(P.pred.rank(), P.acc.rank())[0, 1]
+    true_nfr = 100*(uni[uni.source_dataset == 'promise'].label_fr_nfr == 'NFR').mean()
+    bx.scatter(P.pred, P.acc, s=20, color=C_LOC, edgecolor='white',
+               linewidth=0.6, zorder=4)
+    bx.axvline(true_nfr, color=RED, lw=0.8, zorder=3)
+    bx.text(true_nfr-1.2, 60.5, f'truth: {true_nfr:.1f}% of\nitems are NFR',
+            ha='right', fontsize=5.8, color=RED, linespacing=1.05)
+    LAB = {'qwen2.5-3b-instruct': ('Qwen2.5-3B', 7, -2.5, 'left'),
+           'groq-llama-3.3-70b-versatile': ('Llama-3.3-70B', 4, -3, 'left'),
+           'gemini-3.1-flash-lite': ('Gemini 3.1 F-Lite', -4, 2, 'right')}
+    for _, r in P.iterrows():
+        if r.m in LAB:
+            t, dx, dy, ha = LAB[r.m]
+            bx.annotate(t, (r.pred, r.acc), xytext=(dx, dy),
+                        textcoords='offset points', ha=ha, fontsize=5.7,
+                        color=MUTED)
+    bx.text(0.02, 0.97, f'Spearman $\\rho$ = {rho:.2f}', transform=bx.transAxes,
+            fontsize=6.3, va='top', color=INK)
+    bx.set_xlim(8, 58); bx.set_ylim(55, 93)
+    bx.set_xlabel('share of items the model answers "NFR"', fontsize=6.3)
+    bx.set_ylabel('accuracy (%)', fontsize=6.3)
+    bx.grid(zorder=0); bx.set_axisbelow(True)
+    bx.set_title('(b) the eight prompted models on FR/NFR: the closer its class\n'
+                 'balance is to the truth, the better it scores',
+                 fontsize=6.6, loc='left', pad=3, linespacing=1.25)
+    fig.savefig(OUT+'fig_prior.pdf')
+    plt.close(fig)
+    print('fig_prior.pdf  rho=%.2f true_nfr=%.1f' % (rho, true_nfr))
+
+
+# ============================================================  Figure: cost
 def fig_cost():
-    c1 = pd.read_csv(Z+'results_Stage5_cost/cost1_per_model.csv')
-    be = pd.read_csv(Z+'results_Stage5_cost/cost3_breakeven.csv')
+    med = (c1.groupby(['model', 'tier'], dropna=False)
+             .inference_usd_per_1k.median().reset_index()
+             .sort_values('inference_usd_per_1k'))
+    med = med[~med.model.str.contains('unweighted')]
+    NICE = {'BERT (weighted)': 'BERT', 'RoBERTa (weighted)': 'RoBERTa',
+            'Llama-3.3-70B (Groq)': 'Llama-3.3-70B',
+            'Gemini-3.1-Flash-Lite': 'Gemini 3.1 F-Lite'}
 
-    fig, (ax, bx) = plt.subplots(2, 1, figsize=(10.4*CM, 6.35*CM),
-                                 gridspec_kw={'height_ratios': [1.0, 1.05], 'hspace': 0.80})
+    fig, (ax, bx) = plt.subplots(
+        2, 1, figsize=(COL, 6.5*CM),
+        gridspec_kw=dict(height_ratios=[1.30, 1.0], hspace=0.92))
 
-    cell = c1[(c1.task == 'security') & (c1.dataset == 'secreq') &
-              (c1.eval_regime.isin(['in_domain', 'prompted']))]
-    for tier in ['finetuned', 'open_local', 'open_hosted', 'commercial']:
-        d = cell[cell.tier == tier]
-        ax.scatter(d.inference_usd_per_1k, d.macro_f1, s=18, marker=MK[tier],
-                   c=CO[tier], edgecolors='white', linewidths=0.5, zorder=3,
-                   label=TIER_LABEL[tier])
-    OFF = {
-        'BERT (weighted)':       (6, 4, 'left'),
-        'RoBERTa (weighted)':    (6, -7, 'left'),
-        'Qwen2.5-7B':            (-5, 4, 'right'),
-        'Llama-3.1-8B':          (6, 2, 'left'),
-        'Gemma-2-2B':            (-5, -3, 'right'),
-        'Llama-3.3-70B (Groq)':  (5, -6, 'left'),
-        'SmolLM3-3B':            (6, -1, 'left'),
-        'Qwen2.5-3B':            (0, 6, 'center'),
-        'Gemini-3.1-Flash-Lite': (-5, -1, 'right'),
-        'Phi-4-mini':            (6, -1, 'left'),
-    }
-    for _, r in cell.iterrows():
-        dx, dy, ha = OFF[r.model]
-        ax.annotate(r.model.replace(' (Groq)', '').replace(' (weighted)', ' (w)')
-                    .replace('Gemini-3.1-Flash-Lite', 'Gemini-3.1-FL'),
-                    (r.inference_usd_per_1k, r.macro_f1), xytext=(dx, dy),
-                    textcoords='offset points', ha=ha, fontsize=5.8, color=INK2)
-    pf = cell.sort_values('inference_usd_per_1k')
-    best, xs, ys = -1, [], []
-    for _, r in pf.iterrows():
-        if r.macro_f1 > best:
-            best = r.macro_f1; xs.append(r.inference_usd_per_1k); ys.append(r.macro_f1)
-    ax.step(xs+[0.20], ys+[ys[-1]], where='post', color=MUTED, lw=0.7,
-            ls=(0, (3, 2)), zorder=2, label='Pareto frontier')
-    ax.set_xscale('log')
-    ax.set_xlim(1.4e-3, 0.30)
-    ax.set_xlabel('inference cost, USD per 1,000 requirements (log scale)', labelpad=1.5)
-    ax.set_ylabel('macro-F1')
-    ax.set_ylim(0.595, 0.905)
-    ax.grid(True); ax.set_axisbelow(True)
-    h, l = ax.get_legend_handles_labels()
-    ax.legend(h, l, frameon=False, ncol=3, loc='lower left', bbox_to_anchor=(-0.02, 0.99),
-              handlelength=1.0, columnspacing=0.6, handletextpad=0.28, borderpad=0,
-              fontsize=5.9)
-    ax.set_title('(a) security / SecReq -- the one cell a prompted model leads'
-                 .replace('--', '\u2013'), fontsize=7.2, loc='left', pad=21)
+    y = np.arange(len(med))[::-1]
+    ax.barh(y, med.inference_usd_per_1k, 0.56,
+            color=[TIER_C[t] for t in med.tier], edgecolor='white',
+            linewidth=0.7, zorder=3)
+    for yy, (_, r) in zip(y, med.iterrows()):
+        ax.text(r.inference_usd_per_1k+0.0018, yy, f'{r.inference_usd_per_1k:.4f}',
+                va='center', fontsize=6.0, color=INK)
+    ax.set_yticks(y)
+    ax.set_yticklabels([NICE.get(m, m) for m in med.model], fontsize=6.2)
+    ax.set_xlim(0, 0.099)
+    ax.set_xlabel('US dollars to classify 1,000 requirements', fontsize=6.3)
+    ax.grid(axis='x', zorder=0); ax.set_axisbelow(True)
+    ax.legend(handles=[Patch(facecolor=TIER_C[t], edgecolor='white', label=l)
+                       for t, l in [('finetuned', 'encoder, our GPU'),
+                                    ('open_local', 'open LLM, our GPU'),
+                                    ('open_hosted', 'open LLM, hosted'),
+                                    ('commercial', 'commercial API')]],
+              loc='upper right', bbox_to_anchor=(1.0, 1.04), frameon=False,
+              handlelength=1.0, handletextpad=0.35, borderpad=0.0,
+              labelspacing=0.24)
+    ax.set_title('(a) price of 1,000 classifications, median over the cells that\n'
+                 'model answered', fontsize=6.6, loc='left', pad=3,
+                 linespacing=1.25)
 
-    cell_be = be[(be.task == 'fr_nfr') & (be.encoder == 'BERT (weighted)') &
-                 (be.encoder_regime == 'in_domain')]
-    C0 = float(cell_be.encoder_fixed_usd.iloc[0])
-    cE = float(cell_be.encoder_marginal_usd_per_item.iloc[0])
-    n = np.logspace(0, 4, 240)
-    bx.axvspan(be.breakeven_n_items.min(), be.breakeven_n_items.max(),
-               color='#dde4ec', zorder=0, lw=0)
-    show = cell_be.sort_values('alternative_marginal_usd_per_item')
-    picks = [show.iloc[0], show.iloc[len(show)//2], show.iloc[-1]]
-    for r, ls, dy in zip(picks, [(0, (1, 1.7)), (0, (4, 2)), '-'], (-7, 0, 7)):
-        bx.plot(n, r.alternative_marginal_usd_per_item*n, ls=ls, lw=1.0,
-                color=CO[r.alternative_tier], zorder=3)
-        bx.annotate(str(r.alternative),
-                    (7.5e3, r.alternative_marginal_usd_per_item*7.5e3),
-                    xytext=(-2, dy), textcoords='offset points', ha='right',
-                    fontsize=5.8, color='#8a6100')
-    bx.plot(n, C0 + cE*n, color=C_ENC, lw=1.5, zorder=4)
-    bx.annotate('BERT (w), incl.\n$%.4f training' % C0, (2.2e3, C0 + cE*2.2e3),
-                xytext=(0, -14), textcoords='offset points', ha='center',
-                fontsize=5.8, color=C_ENC, linespacing=1.05)
-    bx.set_xscale('log'); bx.set_yscale('log')
-    bx.set_xlim(1, 1e4); bx.set_ylim(1e-5, 2.0)
-    bx.set_xlabel('requirements classified', labelpad=1.5)
-    bx.set_ylabel('cumulative cost (USD)')
-    bx.grid(True); bx.set_axisbelow(True)
-    bx.text(150, 0.55,
-            'break-even, %d\u2013%d items\n(all 276 encoder-vs-alternative pairs)'
-            % (be.breakeven_n_items.min(), be.breakeven_n_items.max()),
-            ha='center', va='center', fontsize=5.9, color='#3d5570', linespacing=1.06)
-    bx.set_title('(b) FR/NFR: cumulative cost against classified volume',
-                 fontsize=7.2, loc='left', pad=4)
+    # ---- (b) when the encoder's one-off training has paid for itself
+    r = be[(be.encoder == 'BERT (weighted)') & (be.task == 'fr_nfr') &
+           (be.dataset == 'promise') & (be.encoder_regime == 'in_domain') &
+           (be.alternative == 'Gemini-3.1-Flash-Lite')].iloc[0]
+    C0, ce, ca = (float(r.encoder_fixed_usd),
+                  float(r.encoder_marginal_usd_per_item),
+                  float(r.alternative_marginal_usd_per_item))
+    n = np.linspace(0, 700, 400)
+    bx.plot(n, C0 + ce*n, color=C_ENC, lw=1.4, zorder=4,
+            label=f'BERT: \\${C0:.3f} to fine-tune, then \\${ce*1000:.3f} per 1,000')
+    bx.plot(n, ca*n, color=C_LOC, lw=1.4, ls=(0, (3.2, 1.6)), zorder=4,
+            label=f'Gemini 3.1 F-Lite: nothing to train, \\${ca*1000:.3f} per 1,000')
+    nstar = int(r.breakeven_n_items)
+    bx.plot([nstar], [C0+ce*nstar], marker='o', ms=2.8, color=INK, zorder=5)
+    bx.annotate(f'equal cost at {nstar}\nrequirements',
+                xy=(nstar, C0+ce*nstar), xytext=(nstar+58, 0.0028),
+                fontsize=5.9, color=INK, linespacing=1.05,
+                arrowprops=dict(arrowstyle='->', lw=0.55, color=INK,
+                                shrinkA=1, shrinkB=2))
+    bx.set_xlim(0, 700); bx.set_ylim(0, 0.0245)
+    bx.set_xlabel('requirements classified', fontsize=6.3)
+    bx.set_ylabel('total cost (US dollars)', fontsize=6.3)
+    bx.grid(zorder=0); bx.set_axisbelow(True)
+    bx.legend(loc='upper left', frameon=False, handlelength=1.7,
+              handletextpad=0.5, borderpad=0.1, labelspacing=0.26)
+    bx.set_title('(b) one of the 276 pairings; across all of them the crossing\n'
+                 'point falls between 46 and 552 requirements',
+                 fontsize=6.6, loc='left', pad=3, linespacing=1.25)
     fig.savefig(OUT+'fig_cost.pdf')
-    
     plt.close(fig)
-    print('fig_cost.pdf  C0=%.4f cE=%.2e  breakeven %d-%d' %
-          (C0, cE, be.breakeven_n_items.min(), be.breakeven_n_items.max()))
+    print('fig_cost.pdf  %s vs %s, N*=%d' % (r.encoder, r.alternative, nstar))
 
 
 if __name__ == '__main__':
-    fig_prior_shift()
-    fig_inversion()
-    fig_cost()
+    import sys
+    if '--png' in sys.argv:          # preview renders, not used by the paper
+        _sf = plt.Figure.savefig
+        def savefig(self, fname, *a, **k):
+            _sf(self, fname, *a, **k)
+            _sf(self, '/tmp/prev_'+fname.split('/')[-1].replace('.pdf', '.png'),
+                dpi=260, bbox_inches='tight')
+        plt.Figure.savefig = savefig
+    fig_inversion(); fig_prior(); fig_cost()

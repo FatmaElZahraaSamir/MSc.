@@ -1,76 +1,87 @@
-%% Figure 1 -- experimental architecture.
-%% One data spine, two model arms that differ only in whether they consume
-%% training data, one scoring spine, and a regime axis only the encoders traverse.
-%% Encoder path: solid, upper.  Prompted path: dashed, lower.  (Greyscale-safe.)
+%% Figure 1 -- how the experiment is put together.
+%% One data path, two model families, one scoring path, and the three levels
+%% of distribution shift underneath.  Encoders: solid, upper.  Prompted
+%% models: dashed, lower.  Readable in greyscale.
 \begin{figure*}[t]
 \centering
-\begin{tikzpicture}[
+\begin{tikzpicture}[scale=0.81, transform shape,scale=0.81, transform shape,
   font=\footnotesize,
   >={Stealth[length=3.6pt,width=2.8pt]},
   bx/.style   ={draw=rule, line width=0.4pt, rounded corners=1.2pt, fill=white,
-                align=center, text width=23mm, inner xsep=2pt, inner ysep=3pt,
+                align=center, text width=24mm, inner xsep=2pt, inner ysep=3pt,
                 font=\scriptsize},
   src/.style  ={bx, fill=panel},
-  enc/.style  ={bx, draw=encblue, line width=0.9pt},
-  llm/.style  ={bx, draw=llmgold, line width=0.9pt, dashed, dash pattern=on 2pt off 1.4pt},
+  enc/.style  ={bx, draw=encblue, line width=0.9pt, text width=27mm},
+  llm/.style  ={bx, draw=llmgold, line width=0.9pt, dashed,
+                dash pattern=on 2pt off 1.4pt, text width=27mm},
   ed/.style   ={->, draw=rule, line width=0.5pt},
   encd/.style ={->, draw=encblue, line width=0.9pt},
   llmd/.style ={->, draw=llmgold, line width=0.9pt, dashed,
                 dash pattern=on 2pt off 1.4pt},
   tag/.style  ={font=\scriptsize, text=black!60, inner sep=1.2pt},
 ]
-\def\cA{0}\def\cB{2.92}\def\cC{5.84}\def\cD{9.05}\def\cE{12.15}\def\cF{15.25}
+\def\cA{0}\def\cB{2.95}\def\cC{5.85}\def\cD{9.10}\def\cE{12.30}\def\cF{15.35}
 
-%% --- data spine ----------------------------------------------------------
-\node[src] (s1)  at (\cA, 0.62) {\textbf{\pex{}}~\cite{lima2019}\\[0.5pt]969\,$\to$\,968\\47 projects};
-\node[src] (s2)  at (\cA,-0.62) {\textbf{SecReq}~\cite{knauss2011}\\[0.5pt]510\,$\to$\,444\\3 specifications};
-\node[src] (uni) at (\cB, 0)    {\textbf{Unified corpus}\\[0.5pt]1{,}412 requirements\\50 project groups\\67 duplicates dropped};
-\node[src] (spl) at (\cC, 0)    {\textbf{Frozen splits}\\[0.5pt]14 families\\107 folds, seed 42\\SHA-256-pinned ids};
+%% --- the data path -------------------------------------------------------
+\node[src] (s1)  at (\cA, 0.62) {\textbf{\pex{}}~\cite{lima2019}\\[0.5pt]
+                                 969\,$\to$\,968 requirements\\47 projects};
+\node[src] (s2)  at (\cA,-0.62) {\textbf{SecReq}~\cite{knauss2011}\\[0.5pt]
+                                 510\,$\to$\,444 sentences\\3 specifications};
+\node[src] (uni) at (\cB, 0)    {\textbf{One corpus}\\[0.5pt]1{,}412 requirements\\
+                                 50 project groups\\67 duplicates removed};
+\node[src] (spl) at (\cC, 0)    {\textbf{Splits, frozen once}\\[0.5pt]14 families\\
+                                 107 folds, seed 42\\stored, never redrawn};
 
 \draw[ed] (s1.east) -- ++(0.20,0) |- (uni.west);
 \draw[ed] (s2.east) -- ++(0.20,0) |- (uni.west);
 \draw[ed] (uni.east) -- (spl.west);
 
-%% --- the two model arms --------------------------------------------------
-\node[enc] (arm1) at (\cD, 1.04) {\textbf{Encoder arm}\\[0.5pt]BERT, RoBERTa\\$\pm$ class weighting\\\emph{re-fitted per regime}};
-\node[llm] (arm2) at (\cD,-1.04) {\textbf{Prompted arm}\\[0.5pt]8 LLMs, 3 tiers\\zero- and few-shot\\\emph{never fitted}};
+%% --- the two model families ----------------------------------------------
+\node[enc] (fam1) at (\cD, 1.04) {\textbf{Fine-tuned encoders}\\[0.5pt]
+                                  BERT, RoBERTa\\$\pm$ class weighting\\
+                                  \emph{re-fitted at every level}};
+\node[llm] (fam2) at (\cD,-1.04) {\textbf{Prompted LLMs}\\[0.5pt]
+                                  8 models, 3 access tiers\\one fixed instruction\\
+                                  \emph{never fitted to the task}};
 
-\draw[encd] (spl.east) -- ++(0.42,0) |- (arm1.west);
-\draw[llmd] (spl.east) -- ++(0.42,0) |- (arm2.west);
+\draw[encd] (spl.east) -- ++(0.42,0) |- (fam1.west);
+\draw[llmd] (spl.east) -- ++(0.42,0) |- (fam2.west);
 
-%% --- shared scoring spine ------------------------------------------------
-\node[src] (sco) at (\cE, 0) {\textbf{Strict scoring}\\[0.5pt]identical test items\\prompted replies parsed;\\unparseable $=$ wrong\\76{,}115 predictions\\gate: 81 of 87 cells};
-\node[src] (ana) at (\cF, 0) {\textbf{Analysis}\\[0.5pt]\Fm{} $+$ bootstrap CI\\260 paired McNemar\\Holm and BH, $\alpha{=}0.05$\\cost, $N^{\star}{=}C_0/\Delta c$};
+%% --- the shared scoring path ---------------------------------------------
+\node[src] (sco) at (\cE, 0) {\textbf{One scoring rule}\\[0.5pt]the same test items\\
+                              both families\\unusable reply $=$ wrong\\
+                              76{,}115 stored predictions};
+\node[src] (ana) at (\cF, 0) {\textbf{Analysis}\\[0.5pt]\Fm{} with bootstrap CI\\
+                              260 paired McNemar tests\\Holm and BH, $\alpha{=}0.05$\\
+                              cost per item, break-even};
 
-\draw[encd] (arm1.east) -| ($(sco.north)+(0,0.34)$) -- (sco.north);
-\draw[llmd] (arm2.east) -| ($(sco.south)-(0,0.34)$) -- (sco.south);
+\draw[encd] (fam1.east) -| ($(sco.north)+(0,0.34)$) -- (sco.north);
+\draw[llmd] (fam2.east) -| ($(sco.south)-(0,0.34)$) -- (sco.south);
 \draw[ed]   (sco.east) -- (ana.west);
 
-%% --- the regime axis -----------------------------------------------------
-\begin{scope}[shift={(0,-2.50)}]
-  \fill[panel, rounded corners=1.2pt] (-1.32,-0.40) rectangle (16.52,0.42);
-  \node[font=\scriptsize\bfseries, text=black!48, anchor=west] at (-1.24,0.01) {REGIME};
+%% --- the one thing we vary -----------------------------------------------
+\begin{scope}[shift={(0,-2.52)}]
+  \fill[panel, rounded corners=1.2pt] (-1.40,-0.42) rectangle (16.60,0.44);
+  \node[font=\scriptsize\bfseries, text=black!48, anchor=west, align=left]
+       at (-1.33,0.01) {WHAT WE VARY};
   \foreach \x/\name/\desc in {%
-      2.30/{in-domain}/{stratified 5-fold, one corpus},
-      7.60/{cross-project}/{unseen project groups $+$ LOPO},
-      13.05/{cross-dataset}/{train \pex{} $\leftrightarrow$ test SecReq}}{%
-      \node[font=\scriptsize, inner sep=0.8pt] at (\x,0.17) {\textbf{\name}};
-      \node[tag] at (\x,-0.19) {\desc};}
-  \draw[->, draw=black!42, line width=0.55pt] (4.45,0.02) -- (5.30,0.02);
-  \draw[->, draw=black!42, line width=0.55pt] (9.80,0.02) -- (10.65,0.02);
+      3.05/{in-domain}/{train and test inside one corpus},
+      8.30/{cross-project}/{test on projects never seen in training},
+      13.55/{cross-dataset}/{train on one corpus, test on the other}}{%
+      \node[font=\scriptsize, inner sep=0.8pt] at (\x,0.18) {\textbf{\name}};
+      \node[tag] at (\x,-0.20) {\desc};}
+  \draw[->, draw=black!42, line width=0.55pt] (5.30,0.02) -- (6.05,0.02);
+  \draw[->, draw=black!42, line width=0.55pt] (10.75,0.02) -- (11.50,0.02);
 \end{scope}
-\node[tag, anchor=north west, align=left, text width=176mm] at (-1.32,-3.02)
-  {\textbf{Solid (upper) path:} consumes training folds, re-fitted at every
-   station of the regime axis. \textbf{Dashed (lower) path:} consumes only test
-   items, so it is regime-invariant and forms the fixed reference against which
-   the encoders' drop is measured.};
-
 \end{tikzpicture}
-\caption{Experimental architecture. One data spine (left) feeds two model arms
-that differ in exactly one respect: whether they consume training data. Both
-answer the \emph{same} items---so every encoder--LLM comparison is paired
-item-for-item---and both pass through one strict scoring spine (right). The band
-beneath is the study's independent variable: the distribution shift between what
-a model was fitted on and what it is scored on.}
+\caption{How the experiment is put together. One data path on the left feeds two
+families of model that differ in a single respect: whether they may learn from
+labelled training data. The encoders (solid, upper) read the training folds and
+are re-fitted at each level of the band beneath, so their scores move; the
+prompted models (dashed, lower) read only the test items, so their scores cannot
+move with the level, which makes them a fixed reference. Both families answer the
+\emph{same} items --- which is what makes every encoder--LLM comparison a paired
+one --- and both are marked by the same rule. The band is the only thing we
+deliberately vary.}
 \label{fig:arch}
 \end{figure*}
