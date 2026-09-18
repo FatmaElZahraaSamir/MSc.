@@ -1,0 +1,4 @@
+# Python build products. stage1_gitreq.py is imported by tests/, which leaves
+# bytecode behind; the repository ships source and artefacts, not caches.
+__pycache__/
+*.py[cod]
