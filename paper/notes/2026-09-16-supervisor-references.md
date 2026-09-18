@@ -294,8 +294,12 @@ Why it is the strongest candidate:
 * **Sub-type cross-dataset** becomes possible on **seven shared classes** —
   security, performance, portability, availability, fault-tolerance, scalability,
   maintainability — all present in both PROMISE_exp and GitReq. In PROMISE_exp
-  those seven cover 299 NFRs (SE 125, PE 67, A 31, MN 24, SC 22, FT 18, PO 12).
-  GitReq has no legal, look-and-feel, operability or usability class, so this is
+  those seven cover 298 NFRs, counted from the committed Stage 1 artefact
+  *after* de-duplication (security 125, performance 66, availability 31,
+  maintainability 24, scalability 22, fault_tolerance 18, portability 12).
+  The dataset's own published table gives 299 because it counts performance
+  at 67, before the duplicate Stage 1 removes.
+  GitReq has no legal, look_and_feel, operational or usability class, so this is
   a new label-set variant, not our existing top-6.
 * **A third point on the security prior axis.** We currently have two: 12.9 %
   (PROMISE_exp) and 39.9 % (SecReq). GitReq sits between them. That turns the
@@ -343,9 +347,36 @@ the corpus is single-concern by construction — cleaner than PROMISE_exp, which
 not filtered that way. Scalability is the weak class (n = 157, κ = 0.62), and
 maintainability is nearly as small (n = 144). The dataset is new with one paper
 behind it, and its own zero-shot baselines top out at macro-F1 0.641 — useful (no
-ceiling effect), but also a sign the labels are hard. figshare is blocked from
-this session, so the files have not been inspected first-hand: verify the schema
-before wiring a loader.
+ceiling effect), but also a sign the labels are hard.
+
+**The files were supplied by the author on 18 Sep 2026 and have been inspected
+first-hand; everything below is measured, not cited.** Three things the paper
+does not tell you:
+
+* **Two different files are published under the name GitReq.** A csv with 9,926
+  rows, lower-cased labels and a histogram matching nothing in the paper
+  (performance 3,973, security 2,802, …) circulates under that name; measured
+  against the published corpus, **exactly one text string is common to both**.
+  It is a different dataset, not a later version. `stage1_gitreq.py` refuses it.
+* **The archive's own `GitReq.csv` omits the `url` column**, so the loader reads
+  `GitReq_FR.csv` + `GitReq_NFR.csv`, which carry it. The repository is the only
+  available grouping key: 4,079 repositories over 6,301 cleaned rows, largest 46
+  items, only 147 with five or more — enough to stop same-repository leakage,
+  not enough for a meaningful cross-project arm.
+* **Row counts, stated once so every document agrees.** 6,302 published →
+  **6,301** after dropping one row whose entire text is the spreadsheet error
+  `#NAME?` → **6,300** after `build_unified`'s global de-duplication, which
+  removes one internal duplicate pair (same repository, same class, identical
+  text after normalisation). The paper must quote the post-de-duplication
+  figure, since PROMISE_exp's 12.9 % and SecReq's 39.9 % are post-de-duplication
+  too.
+
+The marker artefact is measured rather than asserted: **531 of 531** functional
+items carry a formal marker against **1,030 of 5,770** quality items (17.9 %),
+and a marker-only rule scores **macro-F1 0.7048 at accuracy 0.8365** on GitReq's
+FR/NFR task. Those figures come from `marker_only_baseline()`, so they are
+recomputed from the data rather than retyped; the marker pattern is our
+approximation of the authors' rubric, not their code, and the module says so.
 
 The authors name our study as an intended use — "comparing model behavior across
 formal corpora, community-platform collections, and operational issue trackers".
@@ -434,8 +465,9 @@ support at 444 items.
 
 Sub-type mapping, seven shared classes: SE↔Security, PE↔Performance,
 PO↔Portability, A↔Availability, FT↔Fault-tolerance, SC↔Scalability,
-MN↔Maintainability. PROMISE_exp support over those seven is 299 NFRs; usability,
-operability, look-and-feel and legal have no GitReq counterpart and are declared
+MN↔Maintainability. PROMISE_exp support over those seven is 298 NFRs
+post-de-duplication (not the 299 of the published table); usability,
+operational, look_and_feel and legal have no GitReq counterpart and are declared
 out of this variant's label set.
 
 `promise-reclass`, the Utrecht quartet and DOSSPRE stay on the list as later
@@ -512,3 +544,10 @@ separately. The three have distinct jobs:
 Run all three, state each pair's definitional distance explicitly as §Threats
 already does, and report the prior-correction decomposition. That answers the
 fairness objection with a measurement rather than a caveat.
+
+**Superseded in part.** This addendum was written before the scope was fixed at
+one additional corpus. Under that constraint the decision in *Recommendation*
+above stands — GitReq only — because it is the sole candidate that opens the two
+empty arms. DOSSPRE and `promise-reclass` keep the roles described here and stay
+on the list as later controls; nothing in this section argues for a different
+first corpus.
