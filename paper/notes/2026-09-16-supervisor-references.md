@@ -233,3 +233,154 @@ capacity* — and is the strongest single addition available to us.
   quote from them must be checked against the published PDFs first.
 * Ref. 1 should be cited for the field's claims and its practitioner evidence,
   never for its own performance figures.
+
+---
+
+# Addendum — candidate corpora for the cross-dataset arm
+
+## What we are actually missing
+
+Stage 1 already states the limit in its own header comment: *"SecReq carries
+neither FR/NFR nor sub-type annotation, so there is no second corpus to transfer
+those tasks to. Closing them needs a third labelled corpus."* Concretely:
+
+| Task | in-domain | cross-project | cross-dataset |
+|---|---|---|---|
+| FR/NFR | ✓ | ✓ | **missing** |
+| security | ✓ | ✓ | ✓ (PROMISE_exp ↔ SecReq) |
+| NFR sub-type (×3) | ✓ | ✓ | **missing** |
+
+So the requirement is not "a bigger dataset". It is **a corpus carrying FR/NFR
+and/or ISO-25010-style sub-type labels, annotated independently of PROMISE**.
+Everything below is judged on that.
+
+## PURE is not a transfer arm
+
+PURE (Ferrari et al., 2017) is 79 public requirements documents, 34,268
+sentences, with an XML port for a subset. It ships **no FR/NFR labels** — the
+categorisation is listed as an intended future annotation, not delivered data.
+The recent systematic mapping of LLM4RE datasets (Motger, Catot & Franch,
+arXiv:2510.18787 — 45 studies, 62 public datasets) lists PURE's usable tasks as
+conflict detection and traceability, not classification. Using PURE for our arm
+means annotating it ourselves, which is a thesis chapter of its own, not a cheap
+third arm.
+
+## Ranked options
+
+### 1. GitReq (best fit — fills all three gaps at once)
+
+Kamal, Kabir & Islam, *GitReq: A Gold Standard Dataset for Software Quality
+Requirements*, arXiv:2606.21810 (June 2026). 6,302 expert-validated requirements
+mined from 55,588 candidates over 4,080 GitHub repositories, annotated by experts
+at Fleiss' κ = 0.72, CC BY 4.0, on figshare (`10.6084/m9.figshare.31669477`).
+Labels are ISO/IEC 25010:2011-aligned — the same standard our sub-type taxonomy
+maps to:
+
+| Class | n | share |
+|---|---|---|
+| Security | 1,646 | 26.1 % |
+| Performance | 1,509 | 23.9 % |
+| Portability | 1,284 | 20.4 % |
+| Availability | 738 | 11.7 % |
+| Functional | 531 | 8.4 % |
+| Fault-tolerance | 293 | 4.6 % |
+| Scalability | 157 | 2.5 % |
+| Maintainability | 144 | 2.3 % |
+
+Why it is the strongest candidate:
+
+* **FR/NFR cross-dataset** becomes possible (Functional vs. the seven quality
+  classes) — the arm we currently cannot run at all.
+* **Sub-type cross-dataset** becomes possible on **seven shared classes** —
+  security, performance, portability, availability, fault-tolerance, scalability,
+  maintainability — all present in both PROMISE_exp and GitReq. In PROMISE_exp
+  those seven cover 299 NFRs (SE 125, PE 67, A 31, MN 24, SC 22, FT 18, PO 12).
+  GitReq has no legal, look-and-feel, operability or usability class, so this is
+  a new label-set variant, not our existing top-6.
+* **A third point on the security prior axis.** We currently have two: 12.9 %
+  (PROMISE_exp) and 39.9 % (SecReq). GitReq sits between them. That turns the
+  headline from a two-point inversion into a **dose–response curve** — degradation
+  as a function of prior gap — which is a much harder result to argue with.
+* **Post-dates the pre-training of every model we prompt** (June 2026), so it
+  directly attacks our contamination threat instead of merely conceding it.
+* **Different artefact structure** — GitHub issue text, "terse,
+  implementation-driven", versus our `shall`-style specification sentences. That
+  is Dr. Lamia's structural axis, for free.
+
+Honest caveats: the class proportions are a product of category-specific mining,
+so they are *constructed* priors, not a project's natural base rate — we must say
+so rather than treat 26.1 % as an observed prevalence. Functional is only 531
+items, so the FR/NFR transfer arm is heavily imbalanced in the opposite direction
+from PROMISE_exp (45.9 % FR). The dataset is new and so far has one paper behind
+it; its own zero-shot baselines top out at macro-F1 0.641, which is useful (no
+ceiling effect) but also a sign the labels are hard. figshare is blocked from
+this session, so the files have not been inspected first-hand — verify the schema
+before wiring a loader.
+
+### 2. The Utrecht quartet + PROMISE-reclass (verified first-hand)
+
+Dalpiaz, Dell'Anna, Aydemir & Çevikol, RE'19 supplementary material,
+Zenodo `10.5281/zenodo.3309582`. Downloaded and counted directly:
+
+| File | rows | text? | IsFunctional | IsQuality |
+|---|---|---|---|---|
+| `promise-reclass.csv` | 625 | yes | 310 | 382 |
+| `dronology.csv` | 97 | yes | 94 | 28 |
+| `reqview.csv` | 87 | yes | 75 | 32 |
+| `leeds.csv` | 85 | yes | 44 | 61 |
+| `wasp.csv` | 62 | yes | 55 | 19 |
+| `ds2` (helpdesk) 172, `ds3` (user mgmt) 138, `esa-eucl-est` 236, `INDcombined` 877, `8combined` 1,502 | — | **no — `RequirementText` is blank** | | |
+
+Two things matter here. First, the industrial files are shipped **without
+requirement text** (confidential), so of the "8 datasets, 1,500+ requirements"
+only **331 items outside PROMISE** are actually usable by a text classifier —
+four small, independently annotated corpora. Second, the scheme is
+**multi-label**: `IsFunctional` and `IsQuality` are independent flags, and items
+carrying both are common (Leeds is quality-heavy, Dronology almost entirely
+functional). Mapping that onto our single-label FR/NFR needs an explicit rule,
+and the rule is itself a definitional decision we would have to defend.
+
+`promise-reclass.csv` is a **re-annotation of the same PROMISE texts**, so it is
+not corpus-independent — but that makes it a clean *control*: text held constant,
+annotation scheme changed. It isolates definitional shift from distributional
+shift, which is exactly the confound §Threats currently concedes we cannot
+separate. Cheap and worth running for that reason alone.
+
+Bonus: these are the corpora the batch-size paper (ref. 3) uses — PROMISE
+reclass, Dronology, Leeds, WASP, ReqView — so adopting them makes our numbers
+directly comparable to it.
+
+### 3. Structure-shift corpora (for the P2 study, not this paper)
+
+* **App reviews** — Lu & Liang (EASE '17) label augmented app reviews as FR plus
+  four NFR types (reliability, usability, portability, performance) — partially
+  compatible with our sub-type task and a genuinely different artefact form.
+* **User stories** — the 1,673-story set profiled in the QuRE comparison; the
+  "user story + acceptance criteria" pole of Dr. Lamia's contrast.
+* **Requirements from standards** — the REFSQ'25 replication package
+  (Zenodo `14051453`) classifies into five classes (functional, non-functional,
+  project management, meta, view); different taxonomy, so a mapping study, not a
+  drop-in.
+
+Per the systematic mapping, 67.7 % of public RE datasets are structured
+requirements documents, 12.9 % app reviews and 4.8 % user stories or legal texts,
+and 93.5 % are English-only — so the structure axis is thin but real, and the
+language axis is effectively closed.
+
+### 4. Not transfer arms
+
+* **QuRE** — quality-defect labels, different task (see §2 above).
+* **NICE** (Zenodo `14590935`) — another multi-label re-annotation of PROMISE:
+  same texts again.
+* **Synthetic / LLM-generated requirements** — QuRE's comparison shows they are
+  syntactically simpler and lexically more diverse than real ones, so they would
+  measure the generator, not the shift.
+
+## Recommendation
+
+Add **GitReq** as the third corpus: it is the only candidate that opens the
+FR/NFR and sub-type cross-dataset arms, adds a third prior point for security,
+post-dates pre-training, and changes artefact structure. Add
+**`promise-reclass`** as the definitional-shift control, and the four Utrecht
+corpora as a small secondary FR/NFR arm that ties us to ref. 3. Leave PURE alone
+unless we are prepared to annotate it.
