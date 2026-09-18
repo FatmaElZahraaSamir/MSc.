@@ -420,3 +420,74 @@ post-dates pre-training, and changes artefact structure. Add
 **`promise-reclass`** as the definitional-shift control, and the four Utrecht
 corpora as a small secondary FR/NFR arm that ties us to ref. 3. Leave PURE alone
 unless we are prepared to annotate it.
+
+---
+
+# Addendum 2 — the label-definition objection, and DOSSPRE
+
+A second opinion raised the fairness objection: with three corpora that all carry
+a "security" label but define it differently, a drop under transfer could be
+label-definition shift rather than a generalisation failure, so the comparison is
+"not perfectly fair". The prescription offered was to disclose the difference and
+reword the claim as *generalisation across heterogeneous security annotations*,
+with DOSSPRE proposed as a safer third corpus than GitReq.
+
+**The objection is valid, and the paper already answers it in exactly those
+terms.** §Threats (External), verbatim: *"their security label sets differ —
+PROMISE_exp's derives from the SE sub-class and is non-functional by
+construction, whereas SecReq annotates any security-relevant sentence — so the
+cross-dataset arm carries definitional as well as distributional shift, on one
+corpus pair."* The disclosure prescription therefore tops out at what is already
+written. The interesting question is the one it does not ask: **can the two
+shifts be separated instead of only declared?** Three ways, all cheap:
+
+1. **Prior correction as a discriminating test.** Apply Saerens et al. (2002)
+   prior adjustment to the transferred encoder. If recalibrating to the target
+   prior recovers most of the 42.8 % macro-F1 loss, the shift was
+   *distributional*; if it does not, the residual is the definitional part. One
+   experiment, no retraining, and it converts the objection into a decomposition.
+2. **`promise-reclass` as the text-held-constant control.** Same PROMISE
+   sentences, different annotation scheme (Zenodo 3309582, 625 rows,
+   IsFunctional 310 / IsQuality 382). It measures the annotation-scheme effect
+   with the corpus fixed — the one comparison where definitional shift is the
+   *only* thing varying.
+3. **The evidence already leans distributional.** The transferred encoder labels
+   44.2 % of items security against a true prevalence of 12.9 %, reproducing its
+   training corpus's 39.9 % prior. A purely definitional mismatch does not
+   predict that the error lands on the source prior specifically.
+
+**DOSSPRE — verified, and useful, but not for the reason proposed.** *Dataset of
+Students' Software Projects Requirements*, v2 (Dec 2024), Mendeley
+`10.17632/23xtbvk6yp.2`, CC BY 4.0: 1,317 requirements from 105 student projects
+at Harare Institute of Technology and Amity University Haryana, **801 non-security
+/ 516 security**, plus a ten-label security taxonomy (availability,
+authentication, authorisation, immunity, integrity, intrusion detection,
+confidentiality, auditing, survivability, maintainability).
+
+Its security prevalence is **39.2 %** — statistically indistinguishable from
+SecReq's **39.9 %**. So for this paper DOSSPRE does **not** extend the prior axis;
+it *replicates a point already on it*. That is not a defect, it is a different
+instrument: with the prior held fixed and the text, annotators and provenance all
+changed, a PROMISE_exp → DOSSPRE drop of the same size as PROMISE_exp → SecReq
+supports the prior explanation, and a materially different drop indicts text or
+definition. It is the control the prior claim currently lacks. Its ten security
+sub-labels are also a third taxonomy (immunity, survivability, intrusion
+detection have no PROMISE_exp counterpart), so "easier to unify" holds only at
+the binary level. And the provenance is student coursework, which is weaker, not
+stronger, than GitHub issues written by developers about running systems — worth
+weighing against a paper that criticises the field for leaning on small academic
+corpora.
+
+**The choice is not either/or.** The design is pairwise transfer, so each corpus
+adds pairs rather than replacing one; each pair is scored and reported
+separately. The three have distinct jobs:
+
+| Corpus | Security prevalence | What it contributes |
+|---|---|---|
+| SecReq | 39.9 % | the existing far point |
+| **GitReq** | 26.1 % | **extends the prior axis to three points → dose–response, not a two-point flip** |
+| **DOSSPRE** | 39.2 % | **holds the prior fixed while text, annotators and provenance change → the control** |
+
+Run all three, state each pair's definitional distance explicitly as §Threats
+already does, and report the prior-correction decomposition. That answers the
+fairness objection with a measurement rather than a caveat.
