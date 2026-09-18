@@ -307,15 +307,51 @@ Why it is the strongest candidate:
   implementation-driven", versus our `shall`-style specification sentences. That
   is Dr. Lamia's structural axis, for free.
 
-Honest caveats: the class proportions are a product of category-specific mining,
-so they are *constructed* priors, not a project's natural base rate — we must say
-so rather than treat 26.1 % as an observed prevalence. Functional is only 531
-items, so the FR/NFR transfer arm is heavily imbalanced in the opposite direction
-from PROMISE_exp (45.9 % FR). The dataset is new and so far has one paper behind
-it; its own zero-shot baselines top out at macro-F1 0.641, which is useful (no
-ceiling effect) but also a sign the labels are hard. figshare is blocked from
-this session, so the files have not been inspected first-hand — verify the schema
+**How it is built** (this matters for what we may claim with it). Issues were
+retrieved by *triple-signal* search — a category label (`label:security`), a
+requirement-intent label (feature request / enhancement / user story), and a
+category keyword in title or body — then filtered 55,588 → 8,554 by
+preprocessing, annotated three or four times each by seven annotators (one PhD,
+six with 3–5 years' industry experience) after a three-phase training protocol,
+and resolved by majority vote: 2,152 texts were dropped, 285 recovered, leaving
+6,302 at Fleiss' κ = 0.72 (per-category 0.62–0.75). Text is issue title plus
+body, averaging 52.5 words — an order of magnitude longer and far less formal
+than a PROMISE sentence.
+
+**The caveat that changes how we may use it.** The FR and NFR classes come from
+*different pipelines*. The NFR pipeline is semantic and accepts terse
+implementation talk ("uptime monitoring ping url check for 200"); the FR pipeline
+first requires a formal-language score built on markers — shall, must, will, user
+story, users can — and then applies 14 rejection rules, so **all 531 functional
+items contain a formal marker by construction** (must 78.9 %, shall 10.2 %,
+will 7.7 %). The FR/NFR boundary in GitReq is therefore partly a *surface-form*
+boundary, and a classifier can separate the two classes by spotting a modal verb.
+That is a spurious cue, and it weakens the FR/NFR cross-dataset arm specifically:
+transfer scores there would partly measure whether the model latched onto modal
+verbs rather than onto functionality. The arm is still worth running — but as a
+*shortcut probe*, reported as such, with an error analysis conditioned on marker
+presence. The sub-type arm and the third security prior point do not have this
+problem, and remain the reason to adopt the corpus.
+
+Further caveats: class proportions are a product of category-specific mining, so
+they are *constructed* priors, not natural base rates — we must say so rather
+than treat 26.1 % as observed prevalence. Availability, fault-tolerance and
+maintainability were retrieved by keyword-only or multi-strategy search because
+GitHub labels for them are sparse, so those classes carry their own keyword cue.
+Items raising several quality concerns were deliberately excluded (n = 706), so
+the corpus is single-concern by construction — cleaner than PROMISE_exp, which is
+not filtered that way. Scalability is the weak class (n = 157, κ = 0.62), and
+maintainability is nearly as small (n = 144). The dataset is new with one paper
+behind it, and its own zero-shot baselines top out at macro-F1 0.641 — useful (no
+ceiling effect), but also a sign the labels are hard. figshare is blocked from
+this session, so the files have not been inspected first-hand: verify the schema
 before wiring a loader.
+
+The authors name our study as an intended use — "comparing model behavior across
+formal corpora, community-platform collections, and operational issue trackers".
+Their comparison table also surfaces one more candidate worth a look:
+**NFR-SO**, ~914 Stack Overflow posts over 7 NFR types — another artefact
+structure, and small enough to add cheaply.
 
 ### 2. The Utrecht quartet + PROMISE-reclass (verified first-hand)
 
