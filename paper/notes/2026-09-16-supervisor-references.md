@@ -414,12 +414,33 @@ language axis is effectively closed.
 
 ## Recommendation
 
-Add **GitReq** as the third corpus: it is the only candidate that opens the
-FR/NFR and sub-type cross-dataset arms, adds a third prior point for security,
-post-dates pre-training, and changes artefact structure. Add
-**`promise-reclass`** as the definitional-shift control, and the four Utrecht
-corpora as a small secondary FR/NFR arm that ties us to ref. 3. Leave PURE alone
-unless we are prepared to annotate it.
+**Decision: one corpus, and it is GitReq.** Of every candidate surveyed it is the
+only one that opens *both* empty arms rather than improving an arm we already
+have:
+
+| | FR/NFR arm | sub-type arm | security arm | other gain |
+|---|---|---|---|---|
+| **GitReq** | opens (with the marker caveat) | **opens — 7 shared classes** | third prior point, 26.1 % | post-dates pre-training; new artefact form |
+| DOSSPRE | — | — | replicates SecReq's prior | control only |
+| Utrecht quartet | opens, cleanly, but 331 items | — | — | comparability with ref. 3 |
+| PURE | — | — | — | needs annotating first |
+
+The sub-type task is the decisive argument: Stage 1's own header records that a
+third of the study has no out-of-distribution arm of *any* kind, and GitReq is
+the only candidate with ISO-25010-aligned sub-types at scale. Its being large
+enough to *train* on also opens the deployment-realistic direction — fit on the
+big modern corpus, test on the small old one — which PROMISE_exp ↔ SecReq cannot
+support at 444 items.
+
+Sub-type mapping, seven shared classes: SE↔Security, PE↔Performance,
+PO↔Portability, A↔Availability, FT↔Fault-tolerance, SC↔Scalability,
+MN↔Maintainability. PROMISE_exp support over those seven is 299 NFRs; usability,
+operability, look-and-feel and legal have no GitReq counterpart and are declared
+out of this variant's label set.
+
+`promise-reclass`, the Utrecht quartet and DOSSPRE stay on the list as later
+controls, not as part of this decision. Leave PURE alone unless we are prepared
+to annotate it.
 
 ---
 
