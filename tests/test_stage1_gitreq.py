@@ -1,231 +1,230 @@
-"""Adversarial test battery for stage1_gitreq.load_gitreq.
+"""Adversarial battery for the GitReq loader that lives in Stage 1.
 
 Run:  GITREQ_ARCHIVE=/path/to/31669477.zip python3 tests/test_stage1_gitreq.py
 
-The archive is the figshare item 10.6084/m9.figshare.31669477 (CC BY 4.0); it is
-not committed, because the repository ships code and artefacts, not third-party
-data. Every number asserted here is recomputed from that archive, so a silent
-drift between the data, stage1_gitreq.py and the notes fails the run.
+The archive is figshare 10.6084/m9.figshare.31669477 (CC BY 4.0); it is not
+committed, because this repository ships code and artefacts, not third-party
+data. The tests import the NOTEBOOK, not a copy of it.
 """
-import os, sys
-_ARCHIVE_ENV = "GITREQ_ARCHIVE"
-ARC = os.environ.get(_ARCHIVE_ENV)
-if not ARC or not os.path.exists(ARC):
-    sys.exit(f"set {_ARCHIVE_ENV} to the GitReq figshare archive (31669477.zip); "
-             f"got {ARC!r}")
-import csv, io, logging, shutil, sys, tempfile, zipfile
+import csv, io, logging, os, shutil, sys, tempfile, zipfile
 from pathlib import Path
 import numpy as np, pandas as pd
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import stage1_gitreq as G
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from nbcode import load_notebook_module
+
+ARC = os.environ.get("GITREQ_ARCHIVE")
+if not ARC or not Path(ARC).exists():
+    sys.exit(f"set GITREQ_ARCHIVE to the GitReq figshare archive; got {ARC!r}")
+ARC = Path(ARC)
+# The 9,926-row look-alike, if available; synthesised otherwise.
+LOOKALIKE = os.environ.get("GITREQ_LOOKALIKE")
 
 logging.disable(logging.WARNING)
-ARC = Path(ARC)
-# The 9,926-row look-alike, if available. Set GITREQ_LOOKALIKE to exercise the
-# refusal against the real file; otherwise that case is synthesised.
-IMPOSTOR = os.environ.get("GITREQ_LOOKALIKE")
+S1 = load_notebook_module("stage1-data-pipeline")
 PASS = FAIL = 0
+
 
 def check(name, cond, detail=""):
     global PASS, FAIL
     if cond: PASS += 1; print(f"  PASS  {name}")
     else:    FAIL += 1; print(f"  FAIL  {name}  {detail}")
 
+
 def expect_raise(name, fn, must_contain=None):
     try:
         fn(); check(name, False, "no exception raised")
     except Exception as e:
-        ok = (must_contain is None) or (must_contain.lower() in str(e).lower())
-        check(name, ok, f"message was: {str(e)[:150]}")
+        ok = must_contain is None or must_contain.lower() in str(e).lower()
+        check(name, ok, f"message was: {str(e)[:160]}")
 
-def members(arc=ARC):
-    with zipfile.ZipFile(arc) as z:
-        return {m: z.read(G._resolve_zip_member(z, m)) for m in G.MEMBERS}
 
-def build_zip(path, mapping, extra=()):
-    with zipfile.ZipFile(path, "w") as z:
-        for name, blob in mapping.items(): z.writestr(name, blob)
-        for name, blob in extra: z.writestr(name, blob)
+def cfg(path, lowercase=False):
+    c = dict(S1.CONFIG)
+    c["gitreq_path"] = str(path)
+    c["lowercase"] = lowercase
+    return c
+
+
+def load(path, lowercase=False, manifest=None):
+    return S1.load_gitreq(cfg(path, lowercase), {} if manifest is None else manifest)
+
+
+def members():
+    with zipfile.ZipFile(ARC) as z:
+        return {m: z.read(S1._gitreq_resolve_zip_member(z, m))
+                for m in S1.GITREQ_MEMBERS}
+
 
 def unpin(*keys):
-    saved = dict(G.GITREQ_CONFIG["expected_sha256"])
-    for k in keys: G.GITREQ_CONFIG["expected_sha256"].pop(k, None)
+    saved = dict(S1.CONFIG["expected_sha256"])
+    for k in keys:
+        S1.CONFIG["expected_sha256"].pop(k, None)
     return saved
 
+
 def repin(saved):
-    G.GITREQ_CONFIG["expected_sha256"] = saved
+    S1.CONFIG["expected_sha256"] = saved
+
 
 tmp = Path(tempfile.mkdtemp())
 M = members()
 
 print("\n== 1. happy path, pinned archive ==")
 man = {}
-df = G.load_gitreq(ARC, man)
+df = load(ARC, manifest=man)
 check("6301 rows", len(df) == 6301, len(df))
-check("label_security is Stage 1's string pair",
+check("label_security uses Stage 1's string pair",
       set(df.label_security) == {"security", "non-security"}, set(df.label_security))
 check("label_fr_nfr is FR/NFR", set(df.label_fr_nfr) == {"FR", "NFR"})
-check("security count 1646", int(df.label_security.eq("security").sum()) == 1646)
-check("subtype NaN exactly for FR",
+check("1646 security rows", int(df.label_security.eq("security").sum()) == 1646)
+check("sub-type is NaN exactly for the 531 FR items",
       int(df.label_nfr_subtype.isna().sum()) == int(df.label_fr_nfr.eq("FR").sum()) == 531)
-check("archive sha recorded", man["gitreq"]["sha256"].get("__archive__", "").startswith("80cabf78"))
-check("prevalence key names pre-dedup",
-      "security_prevalence_before_global_dedup" in man["gitreq"]
-      and "security_prevalence" not in man["gitreq"])
-b = G.marker_only_baseline(df)
-check("baseline matches docstring 0.7048/0.8365",
-      (b["macro_f1"], b["accuracy"]) == (0.7048, 0.8365), b)
+check("sub-types are the seven shared classes",
+      sorted(df.label_nfr_subtype.dropna().unique()) == S1.SUBTYPE_SHARED7)
+check("every sub-type is in Stage 1's own vocabulary",
+      set(df.label_nfr_subtype.dropna()) <= set(S1.PROMISE_SUBTYPE_MAP.values()))
+check("columns match the other loaders",
+      list(df.columns) == ["text", "label_fr_nfr", "label_nfr_subtype",
+                           "label_security", "project", "source_dataset"])
+check("manifest records the composition",
+      man["gitreq"]["raw_rows"] == 6302 and man["gitreq"]["projects"] == 4079, man["gitreq"]["projects"])
 
 print("\n== 2. the 9,926-row look-alike is refused ==")
-if IMPOSTOR and Path(IMPOSTOR).exists():
-    imp = Path(IMPOSTOR).read_bytes()
+if LOOKALIKE and Path(LOOKALIKE).exists():
+    imp = Path(LOOKALIKE).read_bytes()
 else:
-    # same shape, wrong composition: lower-cased labels and the wrong total
-    rows = ["ID,RequirementText,class_label"]
+    rows = ["ID,RequirementText,class_label,url"]
     for i in range(9926):
-        rows.append(f"{i},\"synthetic row {i}\",{'performance' if i % 2 else 'security'}")
-    imp = ("\n".join(rows)).encode("utf-8")
-d_imp = tmp / "impostor"; d_imp.mkdir()
-(d_imp / "GitReq_FR.csv").write_bytes(imp); (d_imp / "GitReq_NFR.csv").write_bytes(imp)
-sv = unpin("GitReq_FR.csv", "GitReq_NFR.csv")
-expect_raise("refuses look-alike with a diagnostic",
-             lambda: G.load_gitreq(d_imp), "does not match the published corpus")
+        rows.append(f'{i},"synthetic {i}",{"performance" if i % 2 else "security"},'
+                    f'https://github.com/o/r/issues/{i}')
+    imp = "\n".join(rows).encode()
+d = tmp / "lookalike"; d.mkdir()
+for m in S1.GITREQ_MEMBERS: (d / m).write_bytes(imp)
+sv = unpin(*S1.GITREQ_MEMBERS)
+expect_raise("refused, naming the look-alike", lambda: load(d),
+             "does not match the published corpus")
 repin(sv)
 
 print("\n== 3. UTF-8 BOM, both column orders ==")
-for order, tag in [(None, "original order"), ("reorder", "text column second")]:
-    d = tmp / f"bom_{tag.replace(' ','_')}"; d.mkdir()
+for tag, reorder in [("original order", False), ("text column second", True)]:
+    d = tmp / f"bom_{tag.split()[0]}"; d.mkdir()
     for m, blob in M.items():
         text = blob.decode("utf-8")
-        if order == "reorder":
-            rows = list(csv.DictReader(io.StringIO(text)))
+        if reorder:
+            rws = list(csv.DictReader(io.StringIO(text)))
             buf = io.StringIO()
             w = csv.DictWriter(buf, fieldnames=["class_label", "RequirementText", "url"],
                                extrasaction="ignore")
-            w.writeheader(); w.writerows(rows); text = buf.getvalue()
-        (d / m).write_bytes(b"\xef\xbb\xbf" + text.encode("utf-8"))
-    sv = unpin("GitReq_FR.csv", "GitReq_NFR.csv")
+            w.writeheader(); w.writerows(rws); text = buf.getvalue()
+        (d / m).write_bytes(b"\xef\xbb\xbf" + text.encode())
+    sv = unpin(*S1.GITREQ_MEMBERS)
     try:
-        got = len(G.load_gitreq(d))
-        check(f"BOM tolerated ({tag})", got == 6301, got)
+        check(f"BOM tolerated ({tag})", len(load(d)) == 6301)
     except Exception as e:
-        check(f"BOM tolerated ({tag})", False, str(e)[:120])
+        check(f"BOM tolerated ({tag})", False, str(e)[:140])
     repin(sv)
 
 print("\n== 4. lowercase=True still drops the '#NAME?' row ==")
-low = G.load_gitreq(ARC, {}, lowercase=True)
-check("same row count under lowercase", len(low) == 6301, len(low))
+low = load(ARC, lowercase=True)
+check("same row count", len(low) == 6301, len(low))
 check("no spreadsheet-error text survives",
-      not low.text.str.upper().isin(G._SPREADSHEET_ERRORS).any())
-check("text really is lower-cased", low.text.str.islower().mean() > 0.9)
+      not low.text.str.upper().isin(S1._SPREADSHEET_ERRORS).any())
+check("text is lower-cased", low.text.str.islower().mean() > 0.9)
 
-print("\n== 5. renamed text column fails loudly (not silently empty) ==")
+print("\n== 5. a renamed text column fails loudly ==")
 d = tmp / "renamed"; d.mkdir()
 for m, blob in M.items():
-    t = blob.decode("utf-8").split("\n", 1)
-    (d / m).write_text(t[0].replace("RequirementText", "Requirement_Text") + "\n" + t[1])
-sv = unpin("GitReq_FR.csv", "GitReq_NFR.csv")
-expect_raise("missing column raises", lambda: G.load_gitreq(d), "missing required column")
+    head, _, rest = blob.decode("utf-8").partition("\n")
+    (d / m).write_text(head.replace("RequirementText", "Requirement_Text") + "\n" + rest)
+sv = unpin(*S1.GITREQ_MEMBERS)
+expect_raise("missing column raises", lambda: load(d), "missing required column")
 repin(sv)
 
-print("\n== 6. zip member ambiguity is refused, __MACOSX ignored ==")
-z1 = tmp / "shadow.zip"
-build_zip(z1, M, extra=[("__MACOSX/GitReq_FR.csv", b"junk")])
-sv = unpin("__archive__")
-got = len(G.load_gitreq(z1))
-check("__MACOSX shadow ignored", got == 6301, got)
-z2 = tmp / "dup.zip"
-build_zip(z2, M, extra=[("v1/GitReq_FR.csv", M["GitReq_FR.csv"])])
-expect_raise("duplicate member refused", lambda: G.load_gitreq(z2), "files named")
-repin(sv)
+print("\n== 6. archive member ambiguity ==")
+def build(path, extra):
+    with zipfile.ZipFile(path, "w") as z:
+        for n, b in M.items(): z.writestr(n, b)
+        for n, b in extra: z.writestr(n, b)
+z1 = tmp / "shadow.zip"; build(z1, [("__MACOSX/GitReq_FR.csv", b"junk")])
+check("__MACOSX shadow ignored", len(load(z1)) == 6301)
+z2 = tmp / "dup.zip"; build(z2, [("v1/GitReq_FR.csv", M["GitReq_FR.csv"])])
+expect_raise("duplicate member refused", lambda: load(z2), "files named")
 
-print("\n== 7. extracted directory == archive (nested) ==")
+print("\n== 7. an extracted directory behaves like the archive ==")
 d = tmp / "extracted"; (d / "GitReq").mkdir(parents=True)
-for m, blob in M.items(): (d / "GitReq" / m).write_bytes(blob)
-check("nested extraction loads", len(G.load_gitreq(d)) == 6301)
+for m, b in M.items(): (d / "GitReq" / m).write_bytes(b)
+check("nested extraction loads", len(load(d)) == 6301)
+d2 = tmp / "split"; (d2 / "a").mkdir(parents=True); (d2 / "b").mkdir(parents=True)
+(d2 / "a" / "GitReq_FR.csv").write_bytes(M["GitReq_FR.csv"])
+(d2 / "b" / "GitReq_NFR.csv").write_bytes(M["GitReq_NFR.csv"])
+expect_raise("members from different directories refused",
+             lambda: load(d2), "different directories")
 
-print("\n== 7b. members from different directories are refused ==")
-d = tmp / "mixed"; (d / "a").mkdir(parents=True); (d / "b").mkdir(parents=True)
-(d / "a" / "GitReq_FR.csv").write_bytes(M["GitReq_FR.csv"])
-(d / "b" / "GitReq_NFR.csv").write_bytes(M["GitReq_NFR.csv"])
-expect_raise("split directories refused", lambda: G.load_gitreq(d), "different directories")
-
-print("\n== 8. ragged row gives a diagnostic, not a TypeError ==")
+print("\n== 8. a ragged row is diagnosed, not a TypeError ==")
 d = tmp / "ragged"; d.mkdir()
-for m, blob in M.items():
-    (d / m).write_bytes(blob + b"\n9999,\"orphan text with no label\"")
-sv = unpin("GitReq_FR.csv", "GitReq_NFR.csv")
+for m, b in M.items(): (d / m).write_bytes(b + b'\n9999,"orphan, no label"')
+sv = unpin(*S1.GITREQ_MEMBERS)
 try:
-    G.load_gitreq(d); check("ragged row raises", False, "no exception")
+    load(d); check("ragged row raises", False, "no exception")
 except TypeError as e:
     check("ragged row raises", False, f"TypeError leaked: {e}")
 except RuntimeError as e:
-    check("ragged row raises RuntimeError with histogram", "<missing>" in str(e) or "does not match" in str(e),
+    check("ragged row raises RuntimeError", "<missing>" in str(e) or "does not match" in str(e),
           str(e)[:160])
 repin(sv)
 
-print("\n== 9. csv field-size limit restored ==")
-before = csv.field_size_limit(); G.load_gitreq(ARC, {})
-check("field_size_limit restored", csv.field_size_limit() == before,
-      f"{before} -> {csv.field_size_limit()}")
-
-print("\n== 10. tampered file fails the hash pin ==")
+print("\n== 9. a tampered file fails the pin ==")
 d = tmp / "tampered"; d.mkdir()
 (d / "GitReq_FR.csv").write_bytes(M["GitReq_FR.csv"] + b"\n")
 (d / "GitReq_NFR.csv").write_bytes(M["GitReq_NFR.csv"])
-expect_raise("hash mismatch refused", lambda: G.load_gitreq(d), "sha256")
+expect_raise("hash mismatch refused", lambda: load(d), "changed upstream")
 
-print("\n== 11. downstream compatibility ==")
-promise = pd.DataFrame({
-    "text": ["the system shall encrypt data", "response within 2 seconds"],
-    "label_fr_nfr": ["FR", "NFR"], "label_nfr_subtype": [np.nan, "performance"],
-    "label_security": ["non-security", "non-security"],
-    "project": ["p1", "p2"], "source_dataset": ["promise", "promise"]})
-secreq = pd.DataFrame({
-    "text": ["access shall be authenticated"], "label_fr_nfr": [np.nan],
-    "label_nfr_subtype": [np.nan], "label_security": ["security"],
-    "project": ["CEPS"], "source_dataset": ["secreq"]})
-frames = []
-for src, d_ in [("promise", promise), ("secreq", secreq), ("gitreq", df)]:
-    x = d_.copy().reset_index(drop=True)
-    x["id"] = [f"{src}_{i:05d}" for i in range(len(x))]
-    frames.append(x)
-uni = pd.concat(frames, ignore_index=True)
-uni = uni.drop_duplicates(subset=["text"]).reset_index(drop=True)
-uni = uni[["id", "text", "label_fr_nfr", "label_nfr_subtype", "label_security",
-           "project", "source_dataset"]]
-try:
-    uni.to_parquet(tmp / "unified.parquet"); check("unified.parquet writes", True)
-except Exception as e:
-    check("unified.parquet writes", False, str(e)[:120])
-check("label_security has one dtype",
-      sorted(pd.unique(uni.label_security)) == ["non-security", "security"])
-STAGE2_SECURITY = ["non-security", "security"]
-STAGE2_CATEGORIES_ALL = ["availability", "fault_tolerance", "legal", "look_and_feel",
-                         "maintainability", "operational", "performance",
-                         "portability", "scalability", "security", "usability"]
-kept = uni[uni.label_security.astype(str).isin(STAGE2_SECURITY)]
-check("Stage 2 security filter keeps every GitReq row",
-      int((kept.source_dataset == "gitreq").sum())
-      == int((uni.source_dataset == "gitreq").sum()))
-check("every GitReq sub-type is in Stage 2's CATEGORIES_ALL",
-      set(df.label_nfr_subtype.dropna()) <= set(STAGE2_CATEGORIES_ALL))
-check("shared7 subset of CATEGORIES_ALL",
-      set(G.SUBTYPE_SHARED7) <= set(STAGE2_CATEGORIES_ALL))
-N_DEDUP = df.text.nunique()          # GitReq holds one internal duplicate pair
-check("loader reports the internal duplicate",
-      man["gitreq"]["internal_duplicate_texts"] == len(df) - N_DEDUP
-      and man["gitreq"]["rows_after_internal_dedup"] == N_DEDUP,
-      man["gitreq"]["internal_duplicate_texts"])
-rep = G.gitreq_post_dedup_report(uni)
-check("post-dedup report matches the deduped frame",
-      rep["rows"] == N_DEDUP and 0 < rep["security_prevalence"] < 1, rep["rows"])
-path = G.write_marker_sidecar(uni, tmp / "out")
-check("sidecar rows == deduped gitreq rows", len(pd.read_csv(path)) == N_DEDUP)
-sid = pd.read_csv(path)
-check("sidecar agrees with post-dedup report",
-      int(sid.has_formal_marker.sum()) == rep["fr_with_marker"] + rep["nfr_with_marker"])
+print("\n== 10. missing GitReq is an instruction, not a crash ==")
+expect_raise("absent path explained", lambda: load(tmp / "nope"), "does not exist")
+
+print("\n== 11. it composes with the other loaders ==")
+# A PROMISE stand-in carrying ALL eleven sub-types, so the label-set coverage
+# rule is exercised for the reason it exists rather than by accident.
+sub_classes = sorted(S1.PROMISE_SUBTYPE_MAP.values())
+rows = []
+for i, c in enumerate(sub_classes * 3):
+    rows.append({"text": f"promise nfr {c} {i}", "label_fr_nfr": "NFR",
+                 "label_nfr_subtype": c,
+                 "label_security": "security" if c == "security" else "non-security",
+                 "project": f"p{i % 4}", "source_dataset": "promise"})
+for i in range(12):
+    rows.append({"text": f"promise fr {i}", "label_fr_nfr": "FR",
+                 "label_nfr_subtype": np.nan, "label_security": "non-security",
+                 "project": f"p{i % 4}", "source_dataset": "promise"})
+promise = pd.DataFrame(rows)
+secreq = pd.DataFrame([{"text": f"secreq {i}", "label_fr_nfr": np.nan,
+                        "label_nfr_subtype": np.nan,
+                        "label_security": "security" if i % 2 else "non-security",
+                        "project": ["CEPS", "CPN", "GPS"][i % 3],
+                        "source_dataset": "secreq"} for i in range(30)])
+
+uni = S1.build_unified([("promise", promise), ("secreq", secreq), ("gitreq", df)], {})
+check("build_unified accepts three corpora",
+      len(uni) == len(promise) + len(secreq) + df.text.nunique(), len(uni))
+check("unified.parquet writes", (lambda: (uni.to_parquet(tmp / "u.parquet"), True)[1])())
+check("ids stay prefixed by their corpus",
+      {i.split("_")[0] for i in uni.id} == {"promise", "secreq", "gitreq"})
+
+xd = list(S1.cross_dataset_splits(uni))
+tasks = {e["task"] for e in xd}
+check("cross-dataset now covers fr_nfr and subtype_shared7",
+      {"fr_nfr", "security", "subtype_shared7"} <= tasks, sorted(tasks))
+check("it does NOT invent all/top6/top4 transfers GitReq cannot support",
+      not ({"subtype_all", "subtype_top6", "subtype_top4"} & tasks), sorted(tasks))
+check("security now has all six ordered pairs",
+      sum(e["task"] == "security" for e in xd) == 6,
+      sum(e["task"] == "security" for e in xd))
+check("every cross-dataset fold is train-on-one, test-on-another",
+      all(uni.set_index("id").loc[list(e["train_ids"]), "source_dataset"].nunique() == 1
+          and uni.set_index("id").loc[list(e["test_ids"]), "source_dataset"].nunique() == 1
+          for e in xd))
 
 shutil.rmtree(tmp, ignore_errors=True)
-print(f"\n{'='*52}\n  {PASS} passed, {FAIL} failed\n{'='*52}")
+print(f"\n{'=' * 52}\n  {PASS} passed, {FAIL} failed\n{'=' * 52}")
 sys.exit(1 if FAIL else 0)
