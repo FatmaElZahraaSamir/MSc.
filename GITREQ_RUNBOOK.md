@@ -50,6 +50,15 @@ Kaggle Dataset; Stage 1 finds it under `/kaggle/input` on its own.
 | 6 | `stage4-analysis` | no GPU, Internet **OFF** | everything above |
 | 7 | `stage5-cost` | no GPU, Internet **OFF** | everything above |
 
+### Attaching GitReq on Kaggle
+
+*Add data* → upload the figshare item. The dataset can be named anything, and it
+works whether Kaggle unpacks it or leaves it as a `.zip`: Stage 1 searches
+`/kaggle/input` for the two member files, then for any archive that *contains*
+them, so it is recognised by contents rather than by file name. If it still is
+not found, the error lists everything attached under `/kaggle/input`, which is
+usually enough to see what went wrong in one look.
+
 Stage 1 environment variables:
 
 ```
