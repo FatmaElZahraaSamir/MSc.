@@ -66,6 +66,39 @@ retrained. Every pre-existing prompted evaluation cell — frame and core sample
 same ids in the same order — is identical, so Stages 3 and 3b generate only the
 GitReq cells.
 
+### The API tier changed under us: Groq retired Llama-3.3-70B
+
+On **16 August 2026** Groq moved `llama-3.3-70b-versatile` and
+`llama-3.1-8b-instant` to enterprise-only. A free or developer key now gets
+`model not available` for both, which is exactly what the 24 September probe
+reported. The paper's `open_hosted` tier was that Llama, with **870 committed
+rows**.
+
+What the notebooks now do about it:
+
+* Both harnesses probe **`qwen/qwen3.8-27b` first** (then `qwen3.6-27b`,
+  `gpt-oss-120b`, `gpt-oss-20b`), all at their published list prices. The order
+  is pinned rather than cheapest-first so Stage 3 and Stage 3b cannot resolve to
+  two different hosted models and put their tables in contradiction.
+* The 870 Llama rows are **kept, not replaced**: the substitute gets its own
+  `model_tag` (`groq-qwen3.8-27b`), so nothing overwrites anything. Report
+  Llama-3.3-70B at the coverage it has, and say the provider retired it
+  mid-study.
+* `report_retired_api_models()` now **prints** any committed API model the run
+  cannot reach, with its row count, and records it in `stage3_manifest.json`
+  under `api_models_retired_since_committed_run`. Previously this was silent.
+* An OpenRouter `:free` route is priced 0.0/0.0 **by rule**, so it is no longer
+  reported as an estimate — a free route's rate is a fact, not a guess.
+* `price_override_for()` resolves an id written either way (`qwen/qwen3.8-27b`
+  or `qwen3.8-27b`), and declines to guess if two providers share a short name
+  at different rates.
+
+> **Attach the resume store, or lose the Llama rows.** Without
+> `predictions_llm.parquet` under `/kaggle/input`, Stage 3 starts from scratch
+> and `groq-llama-3.3-70b-versatile` simply will not exist in the results — no
+> re-run can recreate it, because Groq will not serve the model. The notebook
+> now says so in a banner instead of a one-line log message.
+
 **No session is lost to Kaggle's 12-hour limit.** Stage 2 stops itself at
 10.5 h with the store flushed; Stages 3 and 3b check a 10 h budget before each
 model and each API provider, so phase 1 — the core comparison — completes for

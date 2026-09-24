@@ -145,8 +145,13 @@ def fig_prior_shift():
     bx.set_title('(b) BERT$_{\\mathrm{w}}$ on PROMISE', fontsize=7.0, loc='left', pad=13)
 
     # -- (c) prompted models: how well the prior is calibrated predicts accuracy
-    TIER = {'gemini-3.1-flash-lite': 'commercial',
-            'groq-llama-3.3-70b-versatile': 'open_hosted'}
+    # The tier is a column of the store, so read it instead of re-declaring it.
+    # A hard-coded map silently demotes to its 'open_local' default any model
+    # the store gained later - and it gained one, because Groq retired
+    # llama-3.3-70b-versatile on 16 August 2026 and its replacement would have
+    # been drawn as a local model in panel (c). Identical output for the tags
+    # the old map named.
+    TIER = L.drop_duplicates('model_tag').set_index('model_tag').model_type.to_dict()
     z = L[(L.task == 'fr_nfr') & (L.prompt_id == 'base') & (L.shot_k == 0) &
           (L.model_tag != 'openrouter-nemotron-3-nano-30b-a3b')]
     g = z.groupby('model_tag').apply(
