@@ -24,13 +24,40 @@ SHORT = {
 ORDER = ['BERT (weighted)', 'BERT (unweighted)', 'RoBERTa (weighted)', 'RoBERTa (unweighted)',
          'Gemini-3.1-Flash-Lite', 'Llama-3.3-70B (Groq)',
          'Qwen2.5-7B', 'Llama-3.1-8B', 'Gemma-2-2B', 'Phi-4-mini', 'SmolLM3-3B', 'Qwen2.5-3B']
+# The in-domain cells the paper tabulates. GitReq's cells and the shared-7
+# variant are appended only when a three-corpus Stage 4 is present, so this file
+# renders the two-corpus paper byte-for-byte as before until those runs exist.
 CELLS = [('fr_nfr', 'promise'), ('security', 'promise'), ('security', 'secreq'),
          ('subtype_top4', 'promise'), ('subtype_top6', 'promise'), ('subtype_all', 'promise')]
+CELLS_GITREQ = [('fr_nfr', 'gitreq'), ('security', 'gitreq'),
+                ('subtype_shared7', 'promise'), ('subtype_shared7', 'gitreq')]
+if (ev.dataset == 'gitreq').any():
+    CELLS = CELLS + CELLS_GITREQ
+    print('make_tables: three-corpus artefacts detected; '
+          f'{len(CELLS_GITREQ)} GitReq cell(s) added. '
+          'main.tex column specs must be widened to match.')
 
 
-def get(model, task, ds, regime):
+def get(model, task, ds, regime, source=None):
+    """One reportable macro-F1, or None.
+
+    `source` names the corpus a cross-dataset row was TRANSFERRED FROM. With two
+    corpora it was redundant - only SecReq could transfer into PROMISE - so the
+    filter below was (model, task, dataset, regime) and `.iloc[0]` was safe. With
+    a third corpus it is not: secreq_to_promise and gitreq_to_promise are both
+    (security, promise, cross_dataset), and taking the first row would silently
+    print one transfer under a caption describing the other. Stage 4 now carries
+    `transfer_source`; an ambiguous lookup raises instead of guessing.
+    """
     r = ev[(ev.model == model) & (ev.task == task) & (ev.dataset == ds) &
            (ev.eval_regime == regime) & (ev.reportable)]
+    if source is not None and 'transfer_source' in ev.columns:
+        r = r[r.transfer_source == source]
+    if len(r) > 1:
+        srcs = sorted(r.transfer_source.unique()) if 'transfer_source' in r else []
+        raise ValueError(
+            f'{len(r)} reportable rows for ({model}, {task}, {ds}, {regime})'
+            + (f' from sources {srcs}; pass source=... to choose' if srcs else ''))
     return float(r.macro_f1.iloc[0]) if len(r) else None
 
 

@@ -6,3 +6,8 @@
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# Unpacked stage outputs the scripts read (they live in the repo as zips) and
+# the one table fragment main.tex does not \input.
+artefacts/
+tables/tab_in_domain_n.tex
