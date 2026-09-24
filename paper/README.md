@@ -67,3 +67,19 @@ Figures use the Okabe–Ito-derived four-colour categorical set
 local open-weight / commercial). It passes the lightness-band, chroma, CVD-separation
 and normal-vision checks, and every tier additionally carries a marker shape or hatch
 so the figures stay readable in greyscale.
+
+## ICCI 2026 Word version
+
+`icci2026_word/` holds the Word manuscript submitted to ICCI 2026, revised:
+
+| File | What it is |
+|---|---|
+| `ICCI2026_paper_tracked.docx` | the submitted file with every revision as a tracked change (accept/reject in Word) |
+| `ICCI2026_paper_clean.docx` | the same file with all changes accepted |
+| `ICCI2026_paper_clean.pdf` | PDF of the clean file (7 pages) |
+| `fig1_pipeline.png` | Fig. 1, redrawn by `scripts/make_fig1_pipeline.py` |
+
+`scripts/mcnemar_family200.py` re-applies the Holm and Benjamini–Hochberg
+corrections over the 200 reported McNemar tests (Stage 4 corrected all 260 it
+ran, including 60 on sub-type label sets the paper does not report). The BH
+verdicts are identical under both families.
