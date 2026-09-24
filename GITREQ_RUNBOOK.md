@@ -37,35 +37,42 @@ by a taxonomy mismatch is not coverage.
 
 ## Run order
 
-Every stage reads the previous stage's output. Attach the GitReq archive as a
-Kaggle Dataset; Stage 1 finds it under `/kaggle/input` on its own.
+Every stage reads the previous stage's output, and **no code edit is needed on
+Kaggle**: Stage 1 finds GitReq and the frozen `splits.json` under
+`/kaggle/input` on its own, recognising the archive by its contents rather than
+its name, and refusing either if attached twice.
 
-| # | notebook | Kaggle settings | attach |
-|---|---|---|---|
-| 1 | `stage1-data-pipeline` | Internet **ON**, no GPU | GitReq archive + the old `splits.json` |
-| 2 | `stage2-finetuned-baselines` | GPU **T4**, Internet ON | Stage 1 output |
-| 3 | `stage3-llm-harnes` | GPU **T4 x2**, Internet ON | Stage 1 output |
-| 4 | `stage3b-subtype-harness` | GPU **T4 x2**, Internet ON | Stage 1 output |
-| 5 | `stage3b-repair` | no GPU | Stage 3 + 3b output |
-| 6 | `stage4-analysis` | no GPU, Internet **OFF** | everything above |
-| 7 | `stage5-cost` | no GPU, Internet **OFF** | everything above |
+Five small Kaggle Datasets carry the inputs that are not notebook outputs:
+`gitreq` (the figshare archive), `stage1-frozen-splits` (the committed
+`splits.json`), and three resume stores — `predictions_finetuned.parquet`
+(24,280 rows), `predictions_llm.parquet` (35,049) and
+`predictions_subtype.parquet` (16,786) — so that nothing already computed is
+recomputed.
 
-### Attaching GitReq on Kaggle
+| # | notebook | Kaggle settings | attach | time |
+|---|---|---|---|---|
+| 1 | `stage1-data-pipeline` | Internet **ON**, no GPU | `gitreq`, `stage1-frozen-splits` | ~1 min |
+| 2 | `stage2-finetuned-baselines` | GPU **T4**, Internet ON | Stage 1 output, `resume-stage2` | ~14 h → **two sessions** |
+| 3 | `stage3-llm-harnes` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3` | ~3–6 h |
+| 4 | `stage3b-subtype-harness` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3b` | ~2–5 h |
+| 5 | `stage3b-repair` | no GPU | Stage 3 + Stage 3b outputs | minutes |
+| 6 | `stage4-analysis` | no GPU, Internet **OFF** | Stage 1 + final Stage 2 + repair outputs | minutes |
+| 7 | `stage5-cost` | no GPU, Internet **OFF** | final Stage 2 + repair + Stage 4 outputs | minutes |
 
-*Add data* → upload the figshare item. The dataset can be named anything, and it
-works whether Kaggle unpacks it or leaves it as a `.zip`: Stage 1 searches
-`/kaggle/input` for the two member files, then for any archive that *contains*
-them, so it is recognised by contents rather than by file name. If it still is
-not found, the error lists everything attached under `/kaggle/input`, which is
-usually enough to see what went wrong in one look.
+**Resume is verified, not assumed.** Against the frozen splits, Stage 2's two
+resume guards pass (stored fold contents and epoch budgets both match), 228 of
+its 340 planned runs are reused and 112 are new, and not one old fold is
+retrained. Every pre-existing prompted evaluation cell — frame and core sample,
+same ids in the same order — is identical, so Stages 3 and 3b generate only the
+GitReq cells.
 
-Stage 1 environment variables:
-
-```
-STAGE1_GITREQ=/kaggle/input/<your-dataset>/31669477.zip   # or a directory
-STAGE1_FREEZE_SPLITS=/kaggle/input/<old-stage1>/splits.json
-STAGE1_REQUIRE_GITREQ=0                                   # reproduce the 2-corpus study
-```
+**No session is lost to Kaggle's 12-hour limit.** Stage 2 stops itself at
+10.5 h with the store flushed; Stages 3 and 3b check a 10 h budget before each
+model and each API provider, so phase 1 — the core comparison — completes for
+every model before phase 2 is cut. Attach a stopped session's output as the next
+session's input and it resumes. Stage 2's store is complete at exactly
+**208,336 rows**; the new runs take about 14 GPU-hours, measured from the
+committed store's own training times, so it needs two sessions.
 
 ## What changed per stage
 
@@ -93,6 +100,57 @@ STAGE1_REQUIRE_GITREQ=0                                   # reproduce the 2-corp
 * **paper/scripts** — `get()` takes the transfer source and raises on an
   ambiguous lookup instead of silently taking the first row; GitReq cells are
   added only when three-corpus artefacts are present.
+
+## Final review — are cross-project and cross-dataset achieved?
+
+**In the code: yes, and verified end to end.** A synthetic three-corpus run —
+the committed stores plus plausible rows for every new fold and cell
+(`tests/three_corpus_fixture.py`) — was carried through Stage 3b-repair, Stage 4
+and Stage 5. Every new arm reaches the result tables with the right `n` and no
+double counting:
+
+* **cross-dataset**: 10 transfers (was 2) — FR/NFR ×2, security ×6 (every
+  ordered pair of three corpora), shared-7 ×2 — each with `n` equal to its
+  target corpus, each named by its source in `tab2`, one gap row per source in
+  `tab3`, and paired McNemar tests per source in `tab4`.
+* **cross-project**: GitReq FR/NFR, security and shared-7, plus shared-7 on
+  PROMISE_exp, alongside every original arm.
+
+**In the results: not yet.** No model has been trained or prompted on a GitReq
+fold until Stages 2, 3 and 3b run. The synthetic run proves the pipeline carries
+the new arms; it says nothing about their numbers.
+
+**Caveats the write-up must carry.** GitReq's grouping key is the repository —
+4,079 of them over 6,300 rows — so its cross-project arm is close to an
+item-level split, not the cross-document test SecReq's three specifications
+give. And its FR/NFR arm is partly a surface-form probe (`gitreq_marker_flags.csv`).
+
+**What the review found and fixed** — each reproduced first, then verified:
+
+1. Stage 1's locator searched the working directory before `/kaggle/input` and
+   picked up a modified `GitReq_NFR.csv`; the hash pin refused it, but it should
+   never have been offered. Now `/kaggle/input` only, and never twice.
+2. Stage 1 needed an environment variable Kaggle cannot set; the frozen
+   `splits.json` is now discovered like GitReq.
+3. Stage 3b-repair had no `subtype_shared7` label set — a KeyError on the first
+   shared-7 row, so the harness's GitReq sub-type output would never have
+   reached Stage 4.
+4. Stage 4's transfer table would have crashed on its own assertion: two
+   transfers into one corpus land in one column.
+5. Stage 4's gap table took the max of two transfer sources.
+6. Stage 4's McNemar tests kept whichever source Stage 2 wrote first.
+7. Stage 4's sub-type table pooled PROMISE_exp and GitReq for shared-7.
+8. Stage 5 and Stage 2's summary had no shared-7 label set, and would have
+   scored it over the labels observed rather than the ones declared.
+9. Stage 5's break-even figure picked a regime across all encoders and applied
+   it to one — a latent IndexError in the original code, which the two-corpus
+   rows happened to avoid.
+10. The long stages had no session budget (above).
+
+After all of it, the committed two-corpus run still reproduces exactly: all 17
+Stage 4 tables (four gain one identifying column: `transfer_source`,
+`encoder_source`, or `dataset`), all 5 Stage 5 tables, and both Stage 3b-repair
+stores, byte-for-byte in every value.
 
 ## Not done yet, on purpose
 

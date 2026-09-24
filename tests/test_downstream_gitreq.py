@@ -150,5 +150,43 @@ check("an ambiguous lookup raises instead of taking the first row",
 check("GitReq cells are added only when three-corpus artefacts are present",
       "if (ev.dataset == 'gitreq').any():" in mt)
 
+print("\n== 7. the late stages carry the third corpus instead of dropping it ==")
+rep = notebook_source("stage3b-repair")
+check("3b-repair knows subtype_shared7 (a KeyError on its first row otherwise)",
+      '"subtype_shared7": SHARED7}' in rep)
+s5 = notebook_source("stage5-cost")
+check("Stage 5 scores shared-7 over its declared label set, not over y_true",
+      '"subtype_shared7": SHARED7,' in s5)
+check("Stage 5's break-even figure picks the regime from the pinned encoder",
+      "mine = sub[sub.encoder == enc]" in s5)
+s4 = notebook_source("stage4-analysis")
+check("tab2 names the SOURCE of each cross-dataset column once GitReq is present",
+      '" from " + d.transfer_source' in s4)
+check("tab2 appends, never drops, a column outside the canonical order",
+      "piv = piv[order + extra]" in s4)
+check("tab3 reports one gap per transfer source, not the max of two",
+      'tra_all.groupby("transfer_source")' in s4)
+check("tab4 pairs the encoder by (model, regime, source)",
+      "for ftm, reg, src_name in fts:" in s4)
+check("tab5 compares sub-types per corpus, not PROMISE and GitReq pooled",
+      "for task, ds in [(t, d) for t in SUBTYPE_TASKS" in s4)
+s1 = notebook_source("stage1-data-pipeline")
+check("Stage 1 searches only /kaggle/input for GitReq", 'root = KAGGLE_INPUT' in s1
+      and 'Path(".")' not in s1.split("def _gitreq_locate")[1].split("def ")[0])
+check("Stage 1 discovers an attached splits.json - no environment variable needed",
+      'KAGGLE_INPUT.glob("**/splits.json")' in s1)
+
+print("\n== 8. no session is lost to Kaggle's 12-hour limit ==")
+s2 = notebook_source("stage2-finetuned-baselines")
+check("Stage 2 stops cleanly at 10.5 h with the store flushed",
+      '"session_budget_hours": 10.5,' in s2 and "SESSION BUDGET of %.1f h reached" in s2)
+check("Stage 2's summary scores shared-7 over its declared label set",
+      '"subtype_shared7": SHARED7,' in s2)
+for nb in ["stage3-llm-harnes", "stage3b-subtype-harness"]:
+    s = notebook_source(nb)
+    check(f"{nb} checks its 10 h budget before each model and each API provider",
+          '"session_budget_hours": 10.0,' in s and 'over_budget(f"{mid} (phase {phase})")' in s
+          and 'over_budget(f"provider {provider}")' in s)
+
 print(f"\n{'=' * 56}\n  {PASS} passed, {FAIL} failed, {SKIP} skipped\n{'=' * 56}")
 sys.exit(1 if FAIL else 0)

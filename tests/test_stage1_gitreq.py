@@ -6,7 +6,7 @@ The archive is figshare 10.6084/m9.figshare.31669477 (CC BY 4.0); it is not
 committed, because this repository ships code and artefacts, not third-party
 data. The tests import the NOTEBOOK, not a copy of it.
 """
-import csv, io, logging, os, shutil, sys, tempfile, zipfile
+import csv, io, json, logging, os, shutil, sys, tempfile, zipfile
 from pathlib import Path
 import numpy as np, pandas as pd
 
@@ -224,6 +224,43 @@ check("every cross-dataset fold is train-on-one, test-on-another",
       all(uni.set_index("id").loc[list(e["train_ids"]), "source_dataset"].nunique() == 1
           and uni.set_index("id").loc[list(e["test_ids"]), "source_dataset"].nunique() == 1
           for e in xd))
+
+print("\n== 12. discovery on Kaggle: /kaggle/input only, and never twice ==")
+saved_root = S1.KAGGLE_INPUT
+cfg_auto = dict(S1.CONFIG); cfg_auto["gitreq_path"] = None; cfg_auto["lowercase"] = False
+root = tmp / "kin"; (root / "any-name-you-like").mkdir(parents=True)
+(root / "any-name-you-like" / "upload.zip").write_bytes(ARC.read_bytes())
+S1.KAGGLE_INPUT = root
+# decoys in the working directory must be ignored
+cwd = Path.cwd(); decoy = tmp / "decoy"; decoy.mkdir()
+(decoy / "GitReq_FR.csv").write_bytes(M["GitReq_FR.csv"] + b"tampered")
+(decoy / "GitReq_NFR.csv").write_bytes(M["GitReq_NFR.csv"] + b"tampered")
+os.chdir(decoy)
+try:
+    got = S1._gitreq_locate(cfg_auto)
+    check("archive found by contents, under any name", got == root / "any-name-you-like" / "upload.zip", got)
+    check("decoys in the working directory are ignored", len(S1.load_gitreq(cfg_auto, {})) == 6301)
+finally:
+    os.chdir(cwd)
+(root / "second").mkdir(); (root / "second" / "again.zip").write_bytes(ARC.read_bytes())
+expect_raise("GitReq attached twice is refused", lambda: S1._gitreq_locate(cfg_auto), "attach gitreq once")
+empty = tmp / "kin_empty"; (empty / "something-else").mkdir(parents=True)
+S1.KAGGLE_INPUT = empty
+expect_raise("nothing attached: the error lists what is there", lambda: S1._gitreq_locate(cfg_auto),
+             "something-else")
+
+# the frozen splits are discovered the same way
+fz = tmp / "kin_fz"; (fz / "old-stage1").mkdir(parents=True)
+(fz / "old-stage1" / "splits.json").write_text(json.dumps({}))
+S1.KAGGLE_INPUT = fz
+cfg_fz = dict(S1.CONFIG); cfg_fz["freeze_splits_from"] = None
+S1.freeze_known_splits({}, pd.DataFrame({"id": []}), cfg_fz)
+check("an attached splits.json is used as the freeze source",
+      S1.FREEZE_NOTE.get("frozen_from", "").endswith("old-stage1/splits.json"), S1.FREEZE_NOTE)
+(fz / "another").mkdir(); (fz / "another" / "splits.json").write_text("{}")
+expect_raise("two attached splits.json files are refused",
+             lambda: S1.freeze_known_splits({}, pd.DataFrame({"id": []}), cfg_fz), "attach exactly one")
+S1.KAGGLE_INPUT = saved_root
 
 shutil.rmtree(tmp, ignore_errors=True)
 print(f"\n{'=' * 52}\n  {PASS} passed, {FAIL} failed\n{'=' * 52}")
