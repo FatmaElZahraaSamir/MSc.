@@ -1,4 +1,4 @@
-# Book Social Network: مراجعة المشروع + أسئلة الإنترفيو
+# مراجعة مشروع Book Social Network + أسئلة الإنترفيو
 
 > **المشروع:** https://github.com/EsmaelSamir/book-social-network، والنسخة اللي اتراجعت هي commit `078d813` (بتاريخ 11 يوليو 2026).
 >
@@ -107,7 +107,7 @@ Spring Boot 4 و Spring Security مع JWT و JPA/PostgreSQL وإيميلات Asy
 - **اللي بيحصل:** اتجرب من الـ API ومن الـ UI، والرد كان 500 برسالة `Cannot invoke "java.lang.Boolean.booleanValue()"`.
 - **الحل:** في الـ record يبقى `boolean` (primitive)، أو يتكتب `Boolean.TRUE.equals(request.shareable())`. وفي Angular تبقى القيمة الابتدائية `shareable: false`.
 
-#### 8) Feedback من غير تقييم (note) بيبوّظ صفحة الكتب لكل الناس ✅
+#### 8) الـ Feedback من غير تقييم (note) بيبوّظ صفحة الكتب لكل الناس ✅
 - **السبب:** `FeedbackRequest.note` مفيهوش `@NotNull`، والـ `@Positive/@Min/@Max` بيعدّوا الـ null عادي.
   و `Book.getRates()` بيعمل `mapToDouble(Feedback::getNote)`، فبيحصل NPE.
 - **اللي بيحصل:** اتحط feedback واحد من غير note على كتاب، وبعدها `GET /books` و `GET /books/owner` و `GET /books/{id}` كلهم رجعوا **500 لكل اليوزرز**.
@@ -136,7 +136,7 @@ Spring Boot 4 و Spring Security مع JWT و JPA/PostgreSQL وإيميلات Asy
 | `GET /books/999999` (مش موجود) | 404 | 500 |
 | `GET /books/abc` | 400 | 500 |
 | `GET /does-not-exist` | 404 | 500 |
-| JSON بايظ | 400 | 500 |
+| طلب JSON بايظ | 400 | 500 |
 | كود تفعيل غلط | 400 | 500 (والرسالة `"Ivalid Token"` فيها typo) |
 | رفع صورة 12MB | 413 | 500 |
 
@@ -172,7 +172,7 @@ Spring Boot 4 و Spring Security مع JWT و JPA/PostgreSQL وإيميلات Asy
 #### 16) حد رفع الصور الحقيقي 10MB مش 50MB ✅
 - الإعداد `max-file-size: 50MB` متظبط، بس `max-request-size` متسابش على الافتراضي بتاعه وهو 10MB. صورة 12MB رجعت 500.
 
-#### 17) Routes ناقصة في Angular ✅
+#### 17) صفحات (Routes) ناقصة في Angular ✅
 - أيقونة التفاصيل (ℹ) بتروح `books/details/:id` ومفيش route ليها، والـ `BookDetailsComponent` نفسه فاضي ("works!").
 - لينك "My waiting list" الـ route بتاعه معمول comment.
 - الاتنين بيطلّعوا `NG04002: Cannot match any routes`.
@@ -203,7 +203,7 @@ Spring Boot 4 و Spring Security مع JWT و JPA/PostgreSQL وإيميلات Asy
 ### 🟡 جودة كود وترتيب
 دي مش بتوقع المشروع، بس الـ interviewer ممكن يلاحظها:
 
-**Git وحجم الريبو:**
+**الـ Git وحجم الريبو:**
 - **صور يوزرز حقيقية مرفوعة على git:** `book-network/uploads/...` فيها 12 صورة، ولازم فولدر `uploads/` يتضاف لـ `.gitignore`.
 - وفي Docker الصور بتضيع لما الـ container يتمسح، لأن مفيش volume ليها.
 
@@ -260,7 +260,7 @@ Spring Boot 4 و Spring Security مع JWT و JPA/PostgreSQL وإيميلات Asy
 >
 > الأسئلة مكتوبة بالإنجليزي زي ما غالبًا هتتسأل، والإجابة بالعربي ومعاها الكلمات المهمة بالإنجليزي عشان تتقال في الإنترفيو.
 
-### 3.1 Architecture و Spring Boot
+### 3.1 معمارية المشروع و Spring Boot
 
 **⭐ Q1. Walk me through the backend architecture. What happens when a request comes in?**
 
@@ -312,7 +312,7 @@ Spring Boot 4 و Spring Security مع JWT و JPA/PostgreSQL وإيميلات Asy
   وعشان كده `throws MessagingException` في الـ controllers ملهاش لازمة.
 - **فخ:** لو الميثود اتنادت من جوه نفس الكلاس (self-invocation) مش هتبقى async، لأن الاستدعاء مش بيعدّي على الـ proxy.
 
-### 3.2 Security و JWT
+### 3.2 الأمان: Security و JWT
 
 **⭐ Q8. Explain the full authentication flow: register, activate, login, then an authenticated request.**
 
@@ -415,7 +415,7 @@ Spring Boot 4 و Spring Security مع JWT و JPA/PostgreSQL وإيميلات Asy
 بتشغّل `@PreAuthorize` و `@PostAuthorize` و `@Secured` على الميثودز. مش مستخدمة لسه، وهتنفع لو اتضاف ADMIN.
 **فخ حلو:** الـ roles هنا اسمها `USER` من غير `ROLE_`، فـ `hasRole('USER')` **مش هتشتغل**، لأنها بتدور على `ROLE_USER`. الصح هنا `hasAuthority('USER')`.
 
-### 3.3 JPA و Hibernate والداتابيز
+### 3.3 الداتابيز: JPA و Hibernate
 
 **⭐ Q21. Explain the entities and their relationships.**
 
@@ -601,7 +601,7 @@ approve → returnApproved=true                    (المالك أكد، وال
 الإيميل معمول بـ Thymeleaf template في `templates/activate_account.html`. `SpringTemplateEngine.process(name, context)` بيطلّع HTML، و `MimeMessageHelper` بيبعته.
 في الـ dev فيه **MailDev** في docker-compose: الـ SMTP على 1025، والـ UI على `localhost:1080` وبيعرض الإيميلات اللي اتبعتت.
 
-### 3.6 Testing و DevOps
+### 3.6 الاختبارات والـ DevOps
 
 **⭐ Q43. What tests did you write? How do you unit test a service?**
 
@@ -830,7 +830,8 @@ approve → returnApproved=true                    (المالك أكد، وال
 في `BookService.save()` جوه `if (request.id() != null)`، وبنفس الشكل في `uploadBookCoverPicture()`:
 ```java
 book = bookRepository.findById(request.id())
-        .orElseThrow(() -> new EntityNotFoundException("No book found with ID:: " + request.id()));
+        .orElseThrow(() -> new EntityNotFoundException(
+                "No book found with ID:: " + request.id()));
 if (!Objects.equals(book.getOwner().getId(), user.getId())) {
     throw new OperationNotPermittedException("You cannot update others books");
 }
@@ -840,7 +841,8 @@ if (!Objects.equals(book.getOwner().getId(), user.getId())) {
 ```java
 // BookController
 @DeleteMapping("/{book-id}")
-public ResponseEntity<Void> deleteBook(@PathVariable("book-id") Integer bookId, Authentication connectedUser) {
+public ResponseEntity<Void> deleteBook(@PathVariable("book-id") Integer bookId,
+                                       Authentication connectedUser) {
     service.deleteBook(bookId, connectedUser);
     return ResponseEntity.noContent().build();
 }
@@ -849,7 +851,8 @@ public ResponseEntity<Void> deleteBook(@PathVariable("book-id") Integer bookId, 
 @Transactional
 public void deleteBook(Integer bookId, Authentication connectedUser) {
     Book book = bookRepository.findById(bookId)
-            .orElseThrow(() -> new EntityNotFoundException("No book found with ID:: " + bookId));
+            .orElseThrow(() -> new EntityNotFoundException(
+                    "No book found with ID:: " + bookId));
     User user = (User) connectedUser.getPrincipal();
     if (!Objects.equals(book.getOwner().getId(), user.getId())) {
         throw new OperationNotPermittedException("You cannot delete others books");
@@ -920,11 +923,13 @@ protected readonly fullName = this.tokenService.fullName;
 مثال على `BookListComponent`، ونفس الفكرة في باقي الصفحات:
 ```ts
 bookResponse = signal<PageResponseBookResponse>({});
-pages = computed(() => Array.from({ length: this.bookResponse().totalPages ?? 0 }, (_, i) => i));
+pages = computed(() =>
+  Array.from({ length: this.bookResponse().totalPages ?? 0 }, (_, i) => i));
 
 private async findAllBooks() {
   try {
-    this.bookResponse.set(await this.api.invoke(findAllBooks, { page: this.page, size: this.size }));
+    const resp = await this.api.invoke(findAllBooks, { page: this.page, size: this.size });
+    this.bookResponse.set(resp);
   } catch (err) {
     console.log(err);
   }
@@ -1001,7 +1006,8 @@ Optional<Book> findByIdForUpdate(@Param("id") Integer id);
 @Transactional
 public Integer borrowBook(Integer bookId, Authentication connectedUser) {
     Book book = bookRepository.findByIdForUpdate(bookId)
-            .orElseThrow(() -> new EntityNotFoundException("No book found with ID:: " + bookId));
+            .orElseThrow(() -> new EntityNotFoundException(
+                    "No book found with ID:: " + bookId));
     // ... نفس الـ checks والـ save
 }
 ```
@@ -1031,11 +1037,13 @@ class BookServiceTest {
     @Test
     void shouldNotBorrowOwnBook() {
         User owner = User.builder().id(1).build();
-        Book book = Book.builder().id(5).owner(owner).shareable(true).archived(false).build();
+        Book book = Book.builder().id(5).owner(owner)
+                .shareable(true).archived(false).build();
         when(bookRepository.findById(5)).thenReturn(Optional.of(book));
         when(authentication.getPrincipal()).thenReturn(owner);
 
-        assertThrows(OperationNotPermittedException.class, () -> bookService.borrowBook(5, authentication));
+        assertThrows(OperationNotPermittedException.class,
+                () -> bookService.borrowBook(5, authentication));
         verify(bookTransactionHistoryRepository, never()).save(any());
     }
 }
@@ -1118,12 +1126,19 @@ class BookServiceTest {
 
 ### ز) رسمتين تبقى جاهزة تترسم على الورق
 ```
-Auth:  Angular ──(email+password)──▶ /auth/authenticate ──▶ AuthenticationManager ──▶ DaoAuthenticationProvider
-                                                                  │ (UserDetailsService + BCrypt)
-       ◀──────────────── JWT (sub, fullName, authorities, exp) ◀──┘
-       Angular (interceptor: Authorization: Bearer) ──▶ JwtAuthFilter ──▶ SecurityContext ──▶ Controller
+Login:
+  Angular ──(email + password)──▶ POST /auth/authenticate
+          ──▶ AuthenticationManager ──▶ DaoAuthenticationProvider
+              (UserDetailsService + BCrypt)
+  Angular ◀── JWT (sub, fullName, authorities, exp)
 
-Borrow: [available] ──borrow──▶ [borrowed: returned=false] ──return──▶ [returned=true] ──approve──▶ [available]
+Every request:
+  Angular interceptor (Authorization: Bearer <token>)
+          ──▶ JwtAuthFilter ──▶ SecurityContext ──▶ Controller
+
+Borrow:
+  [available] ──borrow──▶ [returned=false] ──return──▶ [returned=true]
+              ──approve──▶ [available]
 ```
 
 ---
@@ -1133,13 +1148,13 @@ Borrow: [available] ──borrow──▶ [borrowed: returned=false] ──retur
 | البند | القيمة |
 |---|---|
 | Spring Boot / Java | 4.0.6 / 17 (Hibernate 7.2) |
-| Angular | 21.2 (zoneless، standalone، Vitest) |
-| الداتابيز | PostgreSQL (الجداول: `_user`، `_user_roles`، `role`، `token`، `book`، `feedback`، `book_transaction_history`) |
+| Angular | 21.2 (zoneless, standalone, Vitest) |
+| الداتابيز | قاعدة PostgreSQL، والجداول: `_user` و `_user_roles` و `role` و `token` و `book` و `feedback` و `book_transaction_history` |
 | Context path | `/api/v1` |
-| Ports | API: 8088 (prod) و 8078 (dev)، UI: 4200، MailDev UI: 1080 و SMTP: 1025، pgAdmin: 5050، Postgres: 5432 |
-| JWT | HS256، مدته 2.4 ساعة (`8640000` ms)، فيه `sub` و `fullName` و `authorities` |
+| Ports | API: 8088 (prod) / 8078 (dev) · UI: 4200 · MailDev: 1080 (UI) / 1025 (SMTP) · pgAdmin: 5050 · Postgres: 5432 |
+| JWT | خوارزمية HS256، ومدته 2.4 ساعة (`8640000` ms)، وفيه `sub` و `fullName` و `authorities` |
 | كود التفعيل | 6 أرقام، `SecureRandom`، صالح 15 دقيقة |
 | Pagination | الافتراضي في الباك `size=10`، والفرونت بيبعت `size=5` |
-| Upload | `max-file-size` 50MB، بس الحد الفعلي 10MB (`max-request-size`) |
+| Upload | الإعداد 50MB (`max-file-size`)، بس الحد الفعلي 10MB (`max-request-size`) |
 | Tests | الباك: 13 test كلهم ناجحين. الفرونت: 18 spec منهم 5 بيفشلوا |
-| Endpoints | `auth`: register, authenticate, activate-account، `books`: CRUD, owner, borrowed, returned, shareable, archived, borrow, return, approve, cover، `feedbacks`: save, by book |
+| Endpoints | `auth`: register, authenticate, activate-account · `books`: CRUD, owner, borrowed, returned, shareable, archived, borrow, return, approve, cover · `feedbacks`: save, by book |
