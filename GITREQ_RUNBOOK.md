@@ -59,6 +59,47 @@ recomputed.
 | 6 | `stage4-analysis` | no GPU, Internet **OFF** | Stage 1 + final Stage 2 + repair outputs | minutes |
 | 7 | `stage5-cost` | no GPU, Internet **OFF** | final Stage 2 + repair + Stage 4 outputs | minutes |
 
+### Where the run stands, and what may run at the same time
+
+Stage 1 and Stage 2 session 1 have both been run. Confirmed from their logs:
+
+| stage | state | output it produced |
+|---|---|---|
+| 1 `stage1-data-pipeline` | **done** | `data_processed/` - `unified.parquet` (7,712 rows), `splits.json` (22 families, 155 folds), 15 of 18 RQ2 cells covered |
+| 2 `stage2-finetuned-baselines` | **85 of 112 new runs** | `predictions_finetuned.parquet` (146,329 rows; complete at 208,336) |
+| 3, 3b, repair, 4, 5 | not started | - |
+
+The 340-run plan reconstructs exactly: 2 models x 155 folds = 310 weighted, plus
+2 x (10 `cross_dataset` + 5 `in_domain_security_promise`) = 30 unweighted. 228
+were already committed, 85 ran in session 1, so **27 remain**. Priced at the
+per-run times session 1 itself measured, session 2 is **3.2 h**, and five
+`xproj_subtype_shared7_gitreq` folds are 5,187 s of that - 10 epochs on ~4,600
+training rows is simply the expensive corner of the plan.
+
+**Stages 2, 3 and 3b are independent of one another and may run concurrently.**
+Not a guess - each one's `glob("/kaggle/input/**/<name>")` calls were read, and
+none of the three reads an artefact another produces:
+
+```
+stage 1 ── unified.parquet + splits.json
+             │
+             ├─→ stage 2   (+ its own predictions_finetuned resume)   ─┐
+             ├─→ stage 3   (+ its own predictions_llm resume)         ─┤ any order,
+             └─→ stage 3b  (+ its own predictions_subtype resume)     ─┘ or together
+                                  │
+                   stage 3 + stage 3b ─→ stage 3b-repair
+                                              │
+       stage 1 + final stage 2 + repair ─→ stage 4 ─→ (tab9) ─→ stage 5
+```
+
+So the three long GPU jobs can be started in any order, or in parallel if Kaggle
+grants a second GPU session; what cannot move is that **repair waits for both 3
+and 3b**, **stage 4 waits for the FINAL stage 2 and repair**, and **stage 5 waits
+for stage 4's `tab9_evaluability.csv`**. Stages repair, 4 and 5 need no GPU.
+
+Remaining GPU cost is about 3.2 h (stage 2 session 2) + 3-6 h (stage 3) + 2-5 h
+(stage 3b) = **9-15 h**, inside one week of Kaggle's ~30 GPU-h allowance.
+
 **Resume is verified, not assumed.** Against the frozen splits, Stage 2's two
 resume guards pass (stored fold contents and epoch budgets both match), 228 of
 its 340 planned runs are reused and 112 are new, and not one old fold is

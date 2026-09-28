@@ -26,6 +26,39 @@ kaggle_datasets/   ← خمس داتاسِتس ترفعيهم على كاجل م
 
 ---
 
+## إنتي فين دلوقتي؟
+
+| المرحلة | الحالة | طلع منها إيه |
+|---|---|---|
+| ١ `stage1-data-pipeline` | ✅ **خلصت** | `data_processed/` — `unified.parquet` (٧,٧١٢ صف) + `splits.json` (٢٢ عيلة، ١٥٥ فولد) |
+| ٢ `stage2-finetuned-baselines` | 🟡 **٨٥ من ١١٢** | `predictions_finetuned.parquet` (١٤٦,٣٢٩ صف — بتخلص عند ٢٠٨,٣٣٦) |
+| ٣ و ٣b و repair و ٤ و ٥ | ⬜ لسه | — |
+
+فاضل **٢٧ رن** في Stage 2 = **٣.٢ ساعة** بالظبط (محسوبة من أوقات رنك نفسه).
+
+## إيه اللي ينفع يرن مع بعض؟
+
+**Stage 2 و Stage 3 و Stage 3b مستقلين تمامًا عن بعض — ينفع تشغّليهم في أي ترتيب
+أو مع بعض.** ده مش تخمين: كل واحدة بتقرا `unified.parquet` من Stage 1 + الـ store
+بتاعها هي بس، ومحدش فيهم بيقرا ناتج التانية.
+
+```
+Stage 1  ──→  Stage 2   (+ resume بتاعها)   ┐
+         ──→  Stage 3   (+ resume بتاعها)   ├─ أي ترتيب / مع بعض
+         ──→  Stage 3b  (+ resume بتاعها)   ┘
+                          │
+          Stage 3 + 3b ──→ repair
+                             │
+   Stage 1 + Stage 2 النهائي + repair ──→ Stage 4 ──→ Stage 5
+```
+
+**اللي ممنوع يتغيّر:** repair لازم تستنى **٣ و ٣b الاتنين**، و Stage 4 لازم تستنى
+**Stage 2 لما تخلص خلاص** + repair، و Stage 5 لازم تستنى `tab9` من Stage 4.
+repair و ٤ و ٥ **مش محتاجين GPU خالص**.
+
+الباقي من الـ GPU: ٣.٢ (Stage 2) + ٣–٦ (Stage 3) + ٢–٥ (Stage 3b) = **٩–١٥ ساعة**،
+داخلين في أسبوع واحد من حصّة كاجل (~٣٠ ساعة).
+
 ## ثانيًا: شغّلي بالترتيب
 
 لكل notebook: **Create → New Notebook → File → Import Notebook** ← اختاري الملف.
