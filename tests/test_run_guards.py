@@ -122,19 +122,41 @@ def preflight(nb, root):
 
 
 def attach(root, files):
+    """files: name -> row count (for splits.json: number of families)."""
+    import json
     for j, (fname, n) in enumerate(files.items()):
         d = Path(root) / f"in{j}"; d.mkdir(parents=True, exist_ok=True)
-        if fname.endswith(".csv"):
+        if fname == "splits.json":
+            (d / fname).write_text(json.dumps({f"family_{i}": [{}] for i in range(n)}))
+        elif fname.endswith(".csv"):
             pd.DataFrame({"x": range(n)}).to_csv(d / fname, index=False)
         else:
             pd.DataFrame({"x": np.zeros(n, dtype="int8")}).to_parquet(d / fname)
 
 
+STAGE1 = {"unified.parquet": 7712, "splits.json": 22}
+RAW3 = {"predictions_llm.parquet": 35049, "predictions_subtype.parquet": 16786}
 CASES = [
-    ("stage2-finetuned-baselines", {"unified.parquet": 7712, "predictions_finetuned.parquet": 146329},
+    ("stage2-finetuned-baselines", dict(STAGE1, **{"predictions_finetuned.parquet": 146329}),
      "RUN",  "", "Stage 2 resumes from its own partial store"),
-    ("stage2-finetuned-baselines", {"unified.parquet": 7712, "predictions_finetuned.parquet": 24280},
+    ("stage2-finetuned-baselines", dict(STAGE1, **{"predictions_finetuned.parquet": 24280}),
      "RUN",  "", "Stage 2 starts the GitReq run from the two-corpus store"),
+    # What actually happened on 28 September: nothing attached at all.
+    ("stage2-finetuned-baselines", {},
+     "STOP", "MISSING INPUT: unified.parquet", "Stage 2 with nothing attached stops at the check"),
+    # The dangerous one: Stage 1 attached, resume store forgotten. Before, this
+    # passed the check and retrained all 340 runs from zero.
+    ("stage2-finetuned-baselines", dict(STAGE1),
+     "STOP", "MISSING INPUT: predictions_finetuned.parquet",
+     "Stage 2 with its resume store missing stops instead of starting from zero"),
+    ("stage2-finetuned-baselines", {"predictions_finetuned.parquet": 146329},
+     "STOP", "MISSING INPUT: splits.json", "Stage 2 without Stage 1 stops at the check"),
+    ("stage4-analysis", {"unified.parquet": 7712, "predictions_finetuned.parquet": 208336},
+     "STOP", "MISSING INPUT: predictions_llm_repaired.parquet",
+     "Stage 4 without the repaired stores stops at the check"),
+    ("stage3b-repair", {"predictions_llm.parquet": 35049},
+     "STOP", "MISSING INPUT: predictions_subtype.parquet",
+     "repair without Stage 3b's store stops at the check"),
     ("stage4-analysis", dict(REPAIRED, **{"unified.parquet": 7712, "predictions_finetuned.parquet": 146329}),
      "STOP", "PARTIAL Stage 2 store", "Stage 4 refuses a partial store"),
     ("stage4-analysis", dict(REPAIRED, **{"unified.parquet": 7712, "predictions_finetuned.parquet": 24280}),
@@ -147,7 +169,7 @@ CASES = [
      "STOP", "PARTIAL Stage 2 store", "Stage 5 refuses a partial store"),
     ("stage5-cost", dict(REPAIRED, **{"predictions_finetuned.parquet": 208336, "tab9_evaluability.csv": 5}),
      "RUN",  "", "Stage 5 accepts the complete GitReq store"),
-    ("stage3b-repair", {"predictions_finetuned.parquet": 146329},
+    ("stage3b-repair", dict(RAW3, **{"predictions_finetuned.parquet": 146329}),
      "RUN",  "", "repair does not consume the encoder store, so a partial one is only reported"),
 ]
 for nb, files, want, reason, label in CASES:
@@ -161,6 +183,83 @@ for nb in ("stage2-finetuned-baselines", "stage3b-repair", "stage4-analysis", "s
     s = src_of(nb)
     want = "RESUMES_FINETUNED = True" if nb.startswith("stage2") else "RESUMES_FINETUNED = False"
     check(f"{nb}: declares {want}", want in s)
+
+# =============================================================================
+print("\n== 3. one missing-input rule, word for word, in every stage that checks ==")
+def input_loop(nb):
+    s = src_of(nb)
+    i = s.index("    problems = []\n    for fname, used_by in WANTED.items():")
+    return s[i:s.index('    print("ROW COUNTS OF WHAT WILL ACTUALLY BE READ")', i)]
+ref = input_loop("stage5-cost")
+check("the rule stops on a missing CONSUMED file",
+      'problems.append(f"MISSING INPUT: {fname}' in ref)
+for nb in ("stage2-finetuned-baselines", "stage3b-repair", "stage4-analysis"):
+    check(f"{nb}: input loop identical to stage5-cost's", input_loop(nb) == ref)
+
+# =============================================================================
+print("\n== 4. a missing or broken store never turns into a run from scratch ==")
+import logging
+
+
+def seeder(nb, root, config=None):
+    """The notebook's own seed_store_from_inputs, pointed at a temp /kaggle/input."""
+    tree = ast.parse(src_of(nb))
+    keep = [n for n in tree.body if isinstance(n, ast.FunctionDef)
+            and n.name in {"seed_store_from_inputs", "read_table", "write_table"}]
+    code = "\n\n".join(ast.unparse(n) for n in keep).replace("/kaggle/input", root)
+    import glob as _glob
+    ns = {"os": os, "glob": _glob, "Path": Path, "pd": pd,
+          "log": logging.getLogger("test"), "CONFIG": dict(config or {}),
+          "STORE_PATH": str(Path(root) / "_work" / "store")}
+    (Path(root) / "_work").mkdir(parents=True, exist_ok=True)
+    exec(compile(code, "<seed>", "exec"), ns)
+    return ns
+
+
+def outcome(fn, *a):
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            return ("returned", fn(*a))
+    except SystemExit:
+        return ("stopped", None)
+    except RuntimeError:
+        return ("refused", None)
+
+
+for nb, store, key in (("stage3-llm-harnes", "predictions_llm", "model_tag"),
+                       ("stage3b-subtype-harness", "predictions_subtype", "model_tag")):
+    with tempfile.TemporaryDirectory() as root:
+        ns = seeder(nb, root, {"allow_fresh_start": False})
+        check(f"{nb}: no store attached -> stops before any model loads",
+              outcome(ns["seed_store_from_inputs"])[0] == "stopped")
+    with tempfile.TemporaryDirectory() as root:
+        ns = seeder(nb, root, {"allow_fresh_start": True})
+        check(f"{nb}: ...unless a clean rebuild is asked for explicitly",
+              outcome(ns["seed_store_from_inputs"]) == ("returned", False))
+    with tempfile.TemporaryDirectory() as root:
+        d = Path(root) / "prev"; d.mkdir()
+        pd.DataFrame({key: ["m"] * 3, "x": [1, 2, 3]}).to_parquet(d / f"{store}.parquet")
+        ns = seeder(nb, root, {"allow_fresh_start": False})
+        check(f"{nb}: an attached store is seeded",
+              outcome(ns["seed_store_from_inputs"]) == ("returned", True)
+              and Path(ns["STORE_PATH"] + ".parquet").exists())
+    with tempfile.TemporaryDirectory() as root:
+        d = Path(root) / "prev"; d.mkdir()
+        pd.DataFrame({"x": [1, 2, 3]}).to_parquet(d / f"{store}.parquet")
+        ns = seeder(nb, root, {"allow_fresh_start": True})
+        check(f"{nb}: an attached but unreadable store is refused, never replaced",
+              outcome(ns["seed_store_from_inputs"])[0] == "refused")
+    check(f"{nb}: allow_fresh_start defaults to False",
+          lift(nb, set(), {"CONFIG"})["CONFIG"].get("allow_fresh_start") is False)
+
+with tempfile.TemporaryDirectory() as root:
+    d = Path(root) / "prev"; d.mkdir()
+    pd.DataFrame({"x": [1, 2, 3]}).to_parquet(d / "predictions_finetuned.parquet")
+    ns = seeder("stage2-finetuned-baselines", root)
+    work = Path(root) / "_work2"; work.mkdir()
+    check("stage2: an attached but unreadable store is refused, never replaced",
+          outcome(ns["seed_store_from_inputs"], {"out_dir": str(work)})[0] == "refused")
 
 print(f"\n{'=' * 60}\n  {PASS} passed, {FAIL} failed, {SKIP} skipped\n{'=' * 60}")
 sys.exit(1 if FAIL else 0)

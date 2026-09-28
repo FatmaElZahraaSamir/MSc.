@@ -172,6 +172,21 @@ also refuses a partial store (24,280 < n < 208,336) in Stages 4 and 5, and the
 two-corpus store beside the GitReq corpus; before, both ran and would have
 scored half the encoder cells.
 
+**A missing input now stops every stage in its first seconds.** Stage 2
+session 2's first attempt ran with nothing attached: the check printed
+`(not attached)` for every file, then `No duplicates. Running the stage now.`,
+and the stage died 30 s later in a traceback. Only Stage 5 treated a missing
+file it reads as a hard stop; Stages 2, repair and 4 now carry the same rule,
+word for word. It matters most for Stage 2, where Stage 1 attached without the
+resume store did not fail at all - it retrained the whole 340-run plan from
+zero (~18 GPU-hours), and the 228 published runs would have come back with
+different numbers, GPU training not being bit-reproducible. Stages 3 and 3b
+likewise stop when their store is missing, unless `allow_fresh_start` is set
+for a deliberate rebuild, and every stage refuses a store that is attached but
+unreadable instead of starting over. **Before Save Version, check that the
+editor's Input panel lists every input** - an empty panel is exactly the
+failure above.
+
 **Stages 3 and 3b must be run from the current files.** Each maps every
 evaluation cell to a fine-tuned comparator label (`COMPARABLE_FT_FOLD`), and
 the map named only the two original corpora: `fr_nfr/gitreq`, `security/gitreq`,
