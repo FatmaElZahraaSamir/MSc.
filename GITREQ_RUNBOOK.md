@@ -52,7 +52,7 @@ recomputed.
 | # | notebook | Kaggle settings | attach | time |
 |---|---|---|---|---|
 | 1 | `stage1-data-pipeline` | Internet **ON**, no GPU | `gitreq`, `stage1-frozen-splits` | ~1 min |
-| 2 | `stage2-finetuned-baselines` | GPU **T4**, Internet ON | Stage 1 output, `resume-stage2` | ~14 h → **two sessions** |
+| 2 | `stage2-finetuned-baselines` | GPU **T4**, Internet ON | Stage 1 output, `resume-stage2` | ~14 h → **two sessions** (measured: 10.5 h + ~3 h) |
 | 3 | `stage3-llm-harnes` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3` | ~3–6 h |
 | 4 | `stage3b-subtype-harness` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3b` | ~2–5 h |
 | 5 | `stage3b-repair` | no GPU | Stage 3 + Stage 3b outputs | minutes |
@@ -104,8 +104,19 @@ What the notebooks now do about it:
 model and each API provider, so phase 1 — the core comparison — completes for
 every model before phase 2 is cut. Attach a stopped session's output as the next
 session's input and it resumes. Stage 2's store is complete at exactly
-**208,336 rows**; the new runs take about 14 GPU-hours, measured from the
-committed store's own training times, so it needs two sessions.
+**208,336 rows**; the new runs take about 14 GPU-hours, so it needs two sessions.
+
+Session 1 has now been run and confirms it. It stopped itself on the budget
+after **85 of the 112 new runs**, flushed the store at **146,329 rows**, and
+printed the resume instruction — the designed behaviour, not a failure. What is
+left is 27 runs, dominated by five `xproj_subtype_shared7_gitreq` folds at
+~1,050 s each (10 epochs on ~4,600 training rows); at the per-run times session
+1 measured, session 2 is roughly **2.5-3.5 h**, well inside one sitting.
+
+In session 2, swap the resume input: attach **session 1's output** and REMOVE
+the `resume-stage2` dataset. Leaving both attached gives the preflight two files
+called `predictions_finetuned.parquet`, and it stops with `DUPLICATE` rather than
+guess which one is current.
 
 ## What changed per stage
 
