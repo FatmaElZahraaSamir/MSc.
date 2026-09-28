@@ -154,10 +154,32 @@ left is 27 runs, dominated by five `xproj_subtype_shared7_gitreq` folds at
 ~1,050 s each (10 epochs on ~4,600 training rows); at the per-run times session
 1 measured, session 2 is roughly **2.5-3.5 h**, well inside one sitting.
 
-In session 2, swap the resume input: attach **session 1's output** and REMOVE
-the `resume-stage2` dataset. Leaving both attached gives the preflight two files
-called `predictions_finetuned.parquet`, and it stops with `DUPLICATE` rather than
-guess which one is current.
+**Session 2, step by step.** Create a NEW notebook from the current
+`stage2-finetuned-baselines.ipynb` (Create -> New Notebook -> File -> Import
+Notebook) rather than re-running the session-1 page: the session-1 version stays
+untouched as the record of what produced the first 146,329 rows, and nothing
+depends on Kaggle letting a notebook mount its own output. Attach exactly two
+inputs - Stage 1's output and **session 1's output** - and not `resume-stage2`
+(or `stage2-outputs`): two files called `predictions_finetuned.parquet` trip the
+`DUPLICATE` guard rather than being picked between. The preflight should read
+`146,329 rows ... -> this is a PARTIAL GitReq store - resume Stage 2 from it`,
+then `Plan: 340 runs total, 27 remaining`. It is finished at `(208336 rows)`,
+and **that notebook's output is "the final Stage 2" for Stages 4 and 5**.
+
+Updating Stage 2's code between the sessions changes no number: the two
+changes are the epochs log line and the preflight messages. The preflight now
+also refuses a partial store (24,280 < n < 208,336) in Stages 4 and 5, and the
+two-corpus store beside the GitReq corpus; before, both ran and would have
+scored half the encoder cells.
+
+**Stages 3 and 3b must be run from the current files.** Each maps every
+evaluation cell to a fine-tuned comparator label (`COMPARABLE_FT_FOLD`), and
+the map named only the two original corpora: `fr_nfr/gitreq`, `security/gitreq`,
+`subtype_shared7/gitreq` and `subtype_shared7/promise` would have been written
+as `unmapped`, and each harness's final gate fails the run over one such row -
+after the full 3-6 h. The four labels are added (the three committed ones per
+harness are unchanged, and no later stage reads the label), and a check now
+stops the harness before any model loads if a frame is ever unmapped again.
 
 ## What changed per stage
 

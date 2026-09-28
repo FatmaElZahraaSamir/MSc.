@@ -98,11 +98,19 @@ repair و ٤ و ٥ **مش محتاجين GPU خالص**.
 > (١٠ إيبوك على ~٤,٦٠٠ صف = ~١٧ دقيقة للفولد). بحساب أوقاتك الفعلية
 > الجلسة ٢ هتاخد **٢.٥–٣.٥ ساعة** بس.
 >
-> **في الجلسة ٢ غيّري الـ Input:** ضيفي **Output الجلسة ١** و**شيلي**
-> داتاسِت `resume-stage2`. لو سيبتي الاتنين، الـ notebook هتلاقي ملفين بنفس
-> الاسم وهتوقف وتقولك `DUPLICATE` — ده حماية عشان متخلطش القديم بالجديد.
+> **الجلسة ٢ خطوة بخطوة — صفحة جديدة، مش تعديل القديمة:**
+> ١. Create → New Notebook → File → Import Notebook ← الملف الجديد `stage2-finetuned-baselines.ipynb`
+> ٢. Settings: GPU T4 · Internet On
+> ٣. Add Input: **Output بتاع Stage 1** + **Output بتاع الجلسة ١ من Stage 2** — بس كده
+>    (**مش** `resume-stage2` ولا `stage2-outputs` — لو اتنين بنفس الاسم هتوقف وتقولك `DUPLICATE`)
+> ٤. Save Version → Save & Run All
 >
-> **خلصت خلاص لما** آخر اللوج يقول `(208336 rows)` بالظبط.
+> أول اللوج لازم يقول: `146,329 rows ... -> this is a PARTIAL GitReq store - resume Stage 2 from it`
+> وبعدها `Plan: 340 runs total, 27 remaining`. **خلصت لما** آخر سطر يقول `(208336 rows)`.
+> **الـ Output بتاع الصفحة الجديدة دي هو "Stage 2 النهائي"** اللي Stage 4 و 5 محتاجينه.
+>
+> ⚠️ **Stage 3 و 3b لازم من الملفات الجديدة** — القديمة كان فيها خطأ كان هيوقّع
+> الرن في آخره بعد ٣–٦ ساعات (`unmapped` على خلايا GitReq). اتصلّح واتجرّب.
 
 ### ٣) `stage3-llm-harnes`
 | | |
