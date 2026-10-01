@@ -77,7 +77,7 @@ repair و ٤ و ٥ **مش محتاجين GPU خالص**.
 ### ٢) `stage2-finetuned-baselines`  ← الأطول، **جلستين**
 | | |
 |---|---|
-| **Settings** | Accelerator: **GPU T4** · Internet: **On** |
+| **Settings** | Accelerator: **GPU T4 ×2** (ده اسمه في كاجل؛ Stage 2 بتستخدم كارت واحد بس والتاني بيفضل فاضي — مفيش أي رقم بيتغيّر) · Internet: **On** |
 | **Add Input (الجلسة ١)** | Output بتاع Stage 1 + داتاسِت `resume-stage2` |
 | **الوقت** | ~١٤ ساعة (محسوبة من أوقات تدريبك الفعلية) |
 
@@ -100,7 +100,7 @@ repair و ٤ و ٥ **مش محتاجين GPU خالص**.
 >
 > **الجلسة ٢ خطوة بخطوة — صفحة جديدة، مش تعديل القديمة:**
 > ١. Create → New Notebook → File → Import Notebook ← الملف الجديد `stage2-finetuned-baselines.ipynb`
-> ٢. Settings: GPU T4 · Internet On
+> ٢. Settings: GPU T4 ×2 · Internet On
 > ٣. Add Input: **Output بتاع Stage 1** + **Output بتاع الجلسة ١ من Stage 2** — بس كده
 >    (**مش** `resume-stage2` ولا `stage2-outputs` — لو اتنين بنفس الاسم هتوقف وتقولك `DUPLICATE`)
 > ٤. Save Version → Save & Run All

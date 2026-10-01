@@ -52,7 +52,7 @@ recomputed.
 | # | notebook | Kaggle settings | attach | time |
 |---|---|---|---|---|
 | 1 | `stage1-data-pipeline` | Internet **ON**, no GPU | `gitreq`, `stage1-frozen-splits` | ~1 min |
-| 2 | `stage2-finetuned-baselines` | GPU **T4**, Internet ON | Stage 1 output, `resume-stage2` | ~14 h → **two sessions** (measured: 10.5 h + ~3 h) |
+| 2 | `stage2-finetuned-baselines` | GPU **T4 x2** (it trains on one; the second idles), Internet ON | Stage 1 output, `resume-stage2` | ~14 h → **two sessions** (measured: 10.5 h + ~3 h) |
 | 3 | `stage3-llm-harnes` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3` | ~3–6 h |
 | 4 | `stage3b-subtype-harness` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3b` | ~2–5 h |
 | 5 | `stage3b-repair` | no GPU | Stage 3 + Stage 3b outputs | minutes |
