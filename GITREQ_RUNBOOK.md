@@ -187,6 +187,18 @@ unreadable instead of starting over. **Before Save Version, check that the
 editor's Input panel lists every input** - an empty panel is exactly the
 failure above.
 
+**Import first, attach second.** The notebook files used to carry Kaggle
+metadata pinning the inputs of the August two-corpus runs
+(`metadata.kaggle.dataSources`, e.g. Stage 2's `kernelVersion 344046825`).
+Importing a file can apply that list and replace inputs attached by hand, and
+Stage 2 session 2 failed twice with nothing mounted at all. The pins are
+removed from all seven files. Even so, the safe order is File -> Import
+Notebook, then Add Input, then a look at the Input panel. If an input is still
+missing, the check now prints what Kaggle actually mounted under
+`/kaggle/input`: nothing at all (no input attached to that version), a folder
+with no files (an attached notebook version with no output), or files under
+other names.
+
 **Stages 3 and 3b must be run from the current files.** Each maps every
 evaluation cell to a fine-tuned comparator label (`COMPARABLE_FT_FOLD`), and
 the map named only the two original corpora: `fr_nfr/gitreq`, `security/gitreq`,

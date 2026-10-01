@@ -261,5 +261,48 @@ with tempfile.TemporaryDirectory() as root:
     check("stage2: an attached but unreadable store is refused, never replaced",
           outcome(ns["seed_store_from_inputs"], {"out_dir": str(work)})[0] == "refused")
 
+# =============================================================================
+print("\n== 5. a failed check shows what Kaggle actually mounted ==")
+ALL_NB = ["stage1-data-pipeline", "stage2-finetuned-baselines", "stage3-llm-harnes",
+          "stage3b-subtype-harness", "stage3b-repair", "stage4-analysis", "stage5-cost"]
+import json as _json
+for nb in ALL_NB:
+    md = _json.loads((Path(__file__).resolve().parent.parent / f"{nb}.ipynb").read_text())["metadata"]
+    check(f"{nb}: the file pins no Kaggle inputs (import cannot replace yours)",
+          md.get("kaggle", {}).get("dataSources", []) == [])
+
+
+def mount_block(nb):
+    s = src_of(nb)
+    i = s.index("        if any(p.startswith(\"MISSING INPUT\") for p in problems):")
+    return s[i:s.index("        raise SystemExit(\"Fix the problems above", i)]
+ref = mount_block("stage5-cost")
+for nb in ("stage2-finetuned-baselines", "stage3b-repair", "stage4-analysis"):
+    check(f"{nb}: mount listing identical to stage5-cost's", mount_block(nb) == ref)
+
+with tempfile.TemporaryDirectory() as root:                       # nothing attached
+    got, out = preflight("stage2-finetuned-baselines", root)
+check("nothing attached -> the log says NOTHING is attached",
+      got == "STOP" and "NOTHING is attached to this version" in out, out[-400:])
+
+with tempfile.TemporaryDirectory() as root:                       # attached, no output
+    (Path(root) / "notebooks" / "zahrasamir" / "gitreq-data-pipeline").mkdir(parents=True)
+    got, out = preflight("stage2-finetuned-baselines", root)
+check("an attached notebook with no output is listed with 0 files",
+      got == "STOP" and "gitreq-data-pipeline/   (0 file(s))" in out, out[-500:])
+
+with tempfile.TemporaryDirectory() as root:                       # unexpected layout
+    d = Path(root) / "notebooks" / "zahrasamir" / "gitreq-data-pipeline"; d.mkdir(parents=True)
+    (d / "data_processed.zip").write_bytes(b"x")
+    got, out = preflight("stage2-finetuned-baselines", root)
+check("files under unexpected names are listed by name",
+      got == "STOP" and "data_processed.zip" in out, out[-500:])
+
+with tempfile.TemporaryDirectory() as root:                       # correct inputs
+    attach(root, dict(STAGE1, **{"predictions_finetuned.parquet": 146329}))
+    got, out = preflight("stage2-finetuned-baselines", root)
+check("a correct run prints no mount listing at all",
+      got == "RUN" and "WHAT IS ACTUALLY MOUNTED" not in out)
+
 print(f"\n{'=' * 60}\n  {PASS} passed, {FAIL} failed, {SKIP} skipped\n{'=' * 60}")
 sys.exit(1 if FAIL else 0)
