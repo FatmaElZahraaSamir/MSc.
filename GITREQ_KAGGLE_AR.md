@@ -31,10 +31,12 @@ kaggle_datasets/   ← خمس داتاسِتس ترفعيهم على كاجل م
 | المرحلة | الحالة | طلع منها إيه |
 |---|---|---|
 | ١ `stage1-data-pipeline` | ✅ **خلصت** | `data_processed/` — `unified.parquet` (٧,٧١٢ صف) + `splits.json` (٢٢ عيلة، ١٥٥ فولد) |
-| ٢ `stage2-finetuned-baselines` | 🟡 **٨٥ من ١١٢** | `predictions_finetuned.parquet` (١٤٦,٣٢٩ صف — بتخلص عند ٢٠٨,٣٣٦) |
-| ٣ و ٣b و repair و ٤ و ٥ | ⬜ لسه | — |
+| ٢ `stage2-finetuned-baselines` | 🔵 **الجلسة ٢ شغالة** (٦ أكتوبر) | الجلسة ١ حفظت ١٤٦,٣٢٩ صف — بتخلص عند **٢٠٨,٣٣٦** |
+| ٣ `stage3-llm-harnes` | ▶️ **ابدئيها دلوقتي، مع Stage 2** | — |
+| ٣b `stage3b-subtype-harness` | ⏳ أول ما Stage 2 (أو Stage 3) تخلص | — |
+| repair و ٤ و ٥ | ⬜ لسه | — |
 
-فاضل **٢٧ رن** في Stage 2 = **٣.٢ ساعة** بالظبط (محسوبة من أوقات رنك نفسه).
+الجلسة ٢ من Stage 2 بتكمّل آخر **٢٧ رن** = حوالي **٣.٢ ساعة** (محسوبة من أوقات رنك نفسه).
 
 ## إيه اللي ينفع يرن مع بعض؟
 
@@ -56,8 +58,16 @@ Stage 1  ──→  Stage 2   (+ resume بتاعها)   ┐
 **Stage 2 لما تخلص خلاص** + repair، و Stage 5 لازم تستنى `tab9` من Stage 4.
 repair و ٤ و ٥ **مش محتاجين GPU خالص**.
 
-الباقي من الـ GPU: ٣.٢ (Stage 2) + ٣–٦ (Stage 3) + ٢–٥ (Stage 3b) = **٩–١٥ ساعة**،
-داخلين في أسبوع واحد من حصّة كاجل (~٣٠ ساعة).
+> 🖥️ **كاجل بيسمح بـ ٢ رن GPU بس في نفس الوقت.** Stage 2 واخدة واحد دلوقتي،
+> فـ **Stage 3 تبدأ معاها حالًا**، و **Stage 3b أول ما واحدة فيهم تخلص**.
+> لو جرّبتي تشغّلي تالت، كاجل هيرفض أو هيخليه يستنى — ده من كاجل، مش عطل في الكود.
+> وبعد Save Version ممكن تقفلي جلسة الصفحة (Stop Session): الـ Version بتكمّل
+> لوحدها في الخلفية، والجلسة المفتوحة بتاكل من حصة الـ GPU على الفاضي.
+
+الباقي من الـ GPU: ٣.٢ (Stage 2) + ٥–٧ (Stage 3) + ٣–٥ (Stage 3b) = **١١–١٥ ساعة**،
+داخلين في أسبوع واحد من حصّة كاجل (~٣٠ ساعة). Stage 3 أطول من الأول لأن نصوص
+GitReq أطول **٣ مرات** من PROMISE (متوسط ٣٤٣ حرف مقابل ١٠٩)، والرن الأصلي
+(من غير GitReq) كان أخد ٦.٤ ساعة.
 
 ## ثانيًا: شغّلي بالترتيب
 
@@ -127,10 +137,21 @@ repair و ٤ و ٥ **مش محتاجين GPU خالص**.
 | | |
 |---|---|
 | **Settings** | Accelerator: **GPU T4 x2** · Internet: **On** |
-| **Add Input** | Output بتاع Stage 1 + داتاسِت `resume-stage3` |
-| **Secrets** (Add-ons → Secrets) | `HF_TOKEN` **لازم** — نفس اللي استخدمتيه قبل كده؛ من غيره Llama-3.1-8B و Gemma-2-2B بيتشالوا (مالهمش بديل). `GROQ_API_KEY` و `GEMINI_API_KEY` اختياري — من غيرهم موديلات الـ API مش هتاخد خلايا GitReq |
-| **الوقت** | ٣–٦ ساعات تقريبًا (حد أمان تلقائي عند ١٠ ساعات) |
-| **نجحت لو** | الـ store زاد من ٣٥,٠٤٩ لحوالي ٦١,٠٠٠ صف |
+| **Add Input** | Output بتاع Stage 1 (`gitReq_data-pipeline`) + **مصدر واحد بس** فيه `predictions_llm.parquet` (٣٥,٠٤٩ صف): داتاسِت `resume-stage3` **أو** Output الرن القديم بتاع `stage3-llm-harnes` — **مش الاتنين** (هتوقف وتقول `DUPLICATE`) |
+| **Secrets** (Add-ons → Secrets) | `HF_TOKEN` **لازم** — نفس اللي استخدمتيه قبل كده؛ من غيره Llama-3.1-8B و Gemma-2-2B بيتشالوا (مالهمش بديل). `GROQ_API_KEY` و `GEMINI_API_KEY` و `OPENROUTER_API_KEY` اختياري — من غيرهم موديلات الـ API مش هتاخد خلايا GitReq |
+| **الوقت** | ٥–٧ ساعات تقريبًا (حد أمان تلقائي عند ١٠ ساعات) |
+| **أول اللوج لازم يقول** | `unified.parquet ... 7,712 rows ... OK` و `predictions_llm.parquet ... 35,049 rows ... OK` وبعدها `No duplicates. Running the stage now.` · `SEEDED 35049 rows` · `Resume check: all 35049 stored predictions are items the current plan selects.` · تحت EVALUATION SETS يظهر `fr_nfr/gitreq` و `security/gitreq` |
+| **نجحت لو** | آخر اللوج: `PASS  every local model answered its whole plan (both phases)` و `RESULT: ALL CHECKS PASSED` — والـ store زاد **٢٥,٢٠٠ صف على الأقل** (الموديلات المحلية، بالظبط) + صفوف الـ API |
+
+> 🛡️ **حمايتين جداد في Stage 3 و 3b:**
+> * **فحص المدخلات نفسه بتاع Stage 2** — لو ملف ناقص أو متكرر أو حجمه غلط بتوقف في أول ثواني
+>   وتطبع **WHAT IS ACTUALLY MOUNTED** (كاجل حط إيه بالظبط).
+> * **فحص الاستكمال** — قبل ما أي موديل يتحمّل، بتتأكد إن كل إجابة قديمة في الـ store
+>   لسه على نفس الأسئلة اللي الكود هيختارها دلوقتي. جرّبته على الـ store بتاعك الحقيقي
+>   مع GitReq: ✅ مطابق، والمطلوب بالظبط **٢٥,٢٠٠** إجابة جديدة (GitReq بس — ولا سؤال
+>   قديم هيتعاد). لو ظهر `THE SEEDED STORE DOES NOT MATCH` — **متغيّريش حاجة وابعتيلي اللوج.**
+> * ولو الرن وقف عند حد الـ ١٠ ساعات، آخر اللوج هيقول `FAIL  every local model answered its
+>   whole plan` ومعاه العدد الناقص → جلسة تانية: صفحة جديدة، Stage 1 + **Output الرن ده** بس.
 
 > ⚠️ **مهم جدًا — Groq شال Llama-3.3-70B.**
 > في ١٦ أغسطس ٢٠٢٦ نقلت Groq الموديل `llama-3.3-70b-versatile` لباقة
@@ -157,9 +178,11 @@ repair و ٤ و ٥ **مش محتاجين GPU خالص**.
 | | |
 |---|---|
 | **Settings** | نفس Stage 3 (GPU T4 x2 · Internet On · نفس الـ Secrets) |
-| **Add Input** | Output بتاع Stage 1 + داتاسِت `resume-stage3b` |
-| **الوقت** | ٢–٥ ساعات تقريبًا |
-| **نجحت لو** | الـ store زاد من ١٦,٧٨٦ لحوالي ٢٨,٤٠٠ صف |
+| **Add Input** | Output بتاع Stage 1 (`gitReq_data-pipeline`) + **مصدر واحد بس** فيه `predictions_subtype.parquet` (١٦,٧٨٦ صف): داتاسِت `resume-stage3b` **أو** Output الرن القديم بتاع `stage3b-subtype-harness` — مش الاتنين |
+| **امتى** | أول ما Stage 2 أو Stage 3 تخلص (كاجل = ٢ GPU في نفس الوقت) |
+| **الوقت** | ٣–٥ ساعات تقريبًا |
+| **أول اللوج لازم يقول** | `predictions_subtype.parquet ... 16,786 rows ... OK` · `SEEDED 16786 rows` · `Resume check: all 16786 stored predictions ...` · تحت EVALUATION SETS يظهر `subtype_shared7/gitreq` و `subtype_shared7/promise` |
+| **نجحت لو** | `PASS  every local model answered its whole plan (both phases)` و `RESULT: ALL CHECKS PASSED` — والـ store زاد **١١,٠٣٠ صف على الأقل** + صفوف الـ API |
 
 ### ٥) `stage3b-repair`
 | | |
@@ -184,7 +207,7 @@ repair و ٤ و ٥ **مش محتاجين GPU خالص**.
 ---
 
 ## حصة الـ GPU
-كاجل بيدي حوالي **٣٠ ساعة GPU في الأسبوع**. الخطة كلها ~٢٠–٢٥ ساعة (Stage 2 ~١٤، و3 و3b مع بعض ~٥–١١). يعني تكفي في أسبوع واحد، بس ابدئي بـ Stage 2 لأنها الأطول.
+كاجل بيدي حوالي **٣٠ ساعة GPU في الأسبوع**، و **٢ رن GPU بس في نفس الوقت**. الباقي بعد جلسة Stage 2 الأولى: ٣.٢ (Stage 2) + ٥–٧ (Stage 3) + ٣–٥ (Stage 3b) = ~١١–١٥ ساعة — يكفوا في أسبوع واحد.
 
 ## لو حاجة وقفت
 كل notebook بتطبع **في الأول** قايمة بالملفات اللي لقتها وعدد صفوفها، وبتوقف برسالة واضحة لو فيه مشكلة (ملف ناقص، ملف متكرر، حجم غلط). اقري أول ٣٠ سطر في اللوج — السبب هيكون مكتوب هناك.

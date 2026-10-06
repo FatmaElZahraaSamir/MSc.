@@ -53,21 +53,24 @@ recomputed.
 |---|---|---|---|---|
 | 1 | `stage1-data-pipeline` | Internet **ON**, no GPU | `gitreq`, `stage1-frozen-splits` | ~1 min |
 | 2 | `stage2-finetuned-baselines` | GPU **T4 x2** (it trains on one; the second idles), Internet ON | Stage 1 output, `resume-stage2` | ~14 h → **two sessions** (measured: 10.5 h + ~3 h) |
-| 3 | `stage3-llm-harnes` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3` | ~3–6 h |
-| 4 | `stage3b-subtype-harness` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3b` | ~2–5 h |
+| 3 | `stage3-llm-harnes` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3` | ~5–7 h |
+| 4 | `stage3b-subtype-harness` | GPU **T4 x2**, Internet ON, `HF_TOKEN` | Stage 1 output, `resume-stage3b` | ~3–5 h |
 | 5 | `stage3b-repair` | no GPU | Stage 3 + Stage 3b outputs | minutes |
 | 6 | `stage4-analysis` | no GPU, Internet **OFF** | Stage 1 + final Stage 2 + repair outputs | minutes |
 | 7 | `stage5-cost` | no GPU, Internet **OFF** | final Stage 2 + repair + Stage 4 outputs | minutes |
 
 ### Where the run stands, and what may run at the same time
 
-Stage 1 and Stage 2 session 1 have both been run. Confirmed from their logs:
+Stage 1 and Stage 2 session 1 have both been run, and Stage 2 session 2 is
+running (6 October). Confirmed from their logs:
 
 | stage | state | output it produced |
 |---|---|---|
 | 1 `stage1-data-pipeline` | **done** | `data_processed/` - `unified.parquet` (7,712 rows), `splits.json` (22 families, 155 folds), 15 of 18 RQ2 cells covered |
-| 2 `stage2-finetuned-baselines` | **85 of 112 new runs** | `predictions_finetuned.parquet` (146,329 rows; complete at 208,336) |
-| 3, 3b, repair, 4, 5 | not started | - |
+| 2 `stage2-finetuned-baselines` | **session 2 running** | session 1: `predictions_finetuned.parquet` (146,329 rows; complete at 208,336) |
+| 3 `stage3-llm-harnes` | start now, beside Stage 2 | - |
+| 3b `stage3b-subtype-harness` | next free GPU slot | - |
+| repair, 4, 5 | not started | - |
 
 The 340-run plan reconstructs exactly: 2 models x 155 folds = 310 weighted, plus
 2 x (10 `cross_dataset` + 5 `in_domain_security_promise`) = 30 unweighted. 228
@@ -92,20 +95,53 @@ stage 1 ── unified.parquet + splits.json
        stage 1 + final stage 2 + repair ─→ stage 4 ─→ (tab9) ─→ stage 5
 ```
 
-So the three long GPU jobs can be started in any order, or in parallel if Kaggle
-grants a second GPU session; what cannot move is that **repair waits for both 3
-and 3b**, **stage 4 waits for the FINAL stage 2 and repair**, and **stage 5 waits
-for stage 4's `tab9_evaluability.csv`**. Stages repair, 4 and 5 need no GPU.
+So the three long GPU jobs can be started in any order. Kaggle runs at most
+**two GPU sessions at a time**, so with Stage 2 session 2 running, Stage 3
+starts beside it and Stage 3b takes the next free slot. What cannot move is
+that **repair waits for both 3 and 3b**, **stage 4 waits for the FINAL stage 2
+and repair**, and **stage 5 waits for stage 4's `tab9_evaluability.csv`**.
+Stages repair, 4 and 5 need no GPU.
 
-Remaining GPU cost is about 3.2 h (stage 2 session 2) + 3-6 h (stage 3) + 2-5 h
-(stage 3b) = **9-15 h**, inside one week of Kaggle's ~30 GPU-h allowance.
+Remaining GPU cost is about 3.2 h (stage 2 session 2) + 5-7 h (stage 3) + 3-5 h
+(stage 3b) = **11-15 h**, inside one week of Kaggle's ~30 GPU-h allowance. The
+harness estimates are measured, not guessed: the committed two-corpus Stage 3
+session ran 6.4 h, 3.5 h of it local generation for 30,336 predictions; the
+GitReq increment is 25,200 local predictions on texts three times as long
+(343 characters on average against PROMISE's 109), plus the API tier. Stage 3b
+owes 11,030.
 
 **Resume is verified, not assumed.** Against the frozen splits, Stage 2's two
 resume guards pass (stored fold contents and epoch budgets both match), 228 of
 its 340 planned runs are reused and 112 are new, and not one old fold is
 retrained. Every pre-existing prompted evaluation cell — frame and core sample,
 same ids in the same order — is identical, so Stages 3 and 3b generate only the
-GitReq cells.
+GitReq cells: against the committed stores, **exactly 25,200** local
+predictions are owed in Stage 3 (3,800 per model, 5,000 for the two prompt
+sub-study models) and **11,030** in Stage 3b (the two `subtype_shared7` cells),
+and not one stored answer lies outside the current plan.
+
+**Stages 3 and 3b now check this themselves, and three more things.**
+
+* **The input check.** Both harnesses carry the check Stages 2, repair, 4 and 5
+  run first: a missing or duplicated input, a corpus of the wrong size or an
+  older (smaller) store stops the run in its first seconds and prints what
+  Kaggle mounted. Two Stage 1 outputs attached at once is the case that
+  mattered: the two-corpus one sorts first, and the harness would have run on
+  it, found no GitReq cell, and finished "successfully". The tables of inputs
+  and expected sizes are now one text in all six stages.
+* **The resume check** (`check_resume_items`). The resume skips an item by its
+  id, so it cannot tell "answered already" from "no longer in the evaluation
+  set". Before any model loads, every stored row must be an item the current
+  plan selects; if the frames, the few-shot pool or the core draw came out
+  differently — another corpus, or a pandas/numpy that samples differently on
+  Kaggle's Python 3.13 image — the run stops instead of queueing replacements
+  beside the old answers. The manifest now records the pandas and numpy
+  versions that drew the samples.
+* **The gate's last check.** The verification gate saw only what was in the
+  store, so a session stopped by its 10 h budget after phase 1 printed
+  `ALL CHECKS PASSED` with phase 2 unfinished. It now fails while any local
+  model still owes predictions — counted on the whole store, before quarantine
+  — and names the count; the manifest records it as `predictions_still_owed`.
 
 ### The API tier changed under us: Groq retired Llama-3.3-70B
 
@@ -300,10 +336,14 @@ GITREQ_ARCHIVE=/path/to/31669477.zip python3 tests/test_stage1_gitreq.py
 GITREQ_ARCHIVE=... STAGE1_LOCAL_MIRROR=/dir/with/the/four/source/files \
     python3 tests/test_gitreq_consistency.py
 THREE_CORPUS_UNIFIED=/path/to/unified.parquet python3 tests/test_downstream_gitreq.py
+python3 tests/test_hosted_models.py
+THREE_CORPUS_UNIFIED=/path/to/unified.parquet \
+STAGE3_STORE=/path/to/predictions_llm.parquet \
+STAGE3B_STORE=/path/to/predictions_subtype.parquet python3 tests/test_run_guards.py
 ```
 
-107 checks in total. They import the notebooks themselves rather than a copy, so
-what is tested is what runs.
+325 checks in total (36 + 32 + 50 + 87 + 120). They import the notebooks
+themselves rather than a copy, so what is tested is what runs.
 
 Verified while writing this: Stage 1 reproduces the committed corpus exactly and
 all 107 committed folds survive unchanged; Stage 4 reproduces all 17 committed

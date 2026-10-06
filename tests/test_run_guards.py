@@ -33,11 +33,22 @@ def src_of(nb):
                    if not l.startswith(("!", "%")))
 
 
+def assigned(n):
+    """Names an assignment binds, tuple targets included (A, B = 1, 2).
+    Subscript targets (CONFIG["x"] = ...) bind no name and are not lifted."""
+    out = set()
+    for t in n.targets:
+        if isinstance(t, ast.Name):
+            out.add(t.id)
+        elif isinstance(t, ast.Tuple):
+            out |= {e.id for e in t.elts if isinstance(e, ast.Name)}
+    return out
+
+
 def lift(nb, funcs, names):
     keep = [n for n in ast.parse(src_of(nb)).body
             if (isinstance(n, ast.FunctionDef) and n.name in funcs) or
-               (isinstance(n, ast.Assign) and
-                {t.id for t in n.targets if isinstance(t, ast.Name)} & names)]
+               (isinstance(n, ast.Assign) and assigned(n) & names)]
     ns = {"np": np, "pd": pd, "os": os}
     exec(compile(ast.fix_missing_locations(ast.Module(body=keep, type_ignores=[])),
                  "<lifted>", "exec"), ns)
@@ -134,6 +145,9 @@ def attach(root, files):
             pd.DataFrame({"x": np.zeros(n, dtype="int8")}).to_parquet(d / fname)
 
 
+# Every stage that carries the input check.
+CHECKING = ["stage2-finetuned-baselines", "stage3-llm-harnes", "stage3b-subtype-harness",
+            "stage3b-repair", "stage4-analysis", "stage5-cost"]
 STAGE1 = {"unified.parquet": 7712, "splits.json": 22}
 RAW3 = {"predictions_llm.parquet": 35049, "predictions_subtype.parquet": 16786}
 CASES = [
@@ -171,6 +185,28 @@ CASES = [
      "RUN",  "", "Stage 5 accepts the complete GitReq store"),
     ("stage3b-repair", dict(RAW3, **{"predictions_finetuned.parquet": 146329}),
      "RUN",  "", "repair does not consume the encoder store, so a partial one is only reported"),
+    # The harnesses carry the same check since the GitReq run: the corpus and
+    # their own resume store are the two files they read.
+    ("stage3-llm-harnes", {"unified.parquet": 7712, "predictions_llm.parquet": 35049},
+     "RUN",  "", "Stage 3 starts the GitReq run from the committed store"),
+    ("stage3-llm-harnes", {"unified.parquet": 7712, "predictions_llm.parquet": 61000},
+     "RUN",  "", "Stage 3 resumes from a larger store of its own (a session cut short)"),
+    ("stage3-llm-harnes", {"unified.parquet": 7712},
+     "STOP", "MISSING INPUT: predictions_llm.parquet",
+     "Stage 3 with its resume store missing stops at the check"),
+    ("stage3-llm-harnes", {"predictions_llm.parquet": 35049},
+     "STOP", "MISSING INPUT: unified.parquet", "Stage 3 without Stage 1 stops at the check"),
+    ("stage3-llm-harnes", {"unified.parquet": 7712, "predictions_llm.parquet": 30000},
+     "STOP", "SMALLER than the committed reference", "Stage 3 refuses an older, smaller store"),
+    ("stage3-llm-harnes", {"unified.parquet": 5000, "predictions_llm.parquet": 35049},
+     "STOP", "CORPUS SIZE CHANGED", "Stage 3 refuses a corpus of any other size"),
+    ("stage3b-subtype-harness", {"unified.parquet": 7712, "predictions_subtype.parquet": 16786},
+     "RUN",  "", "Stage 3b starts the GitReq run from the committed store"),
+    ("stage3b-subtype-harness", {"unified.parquet": 7712},
+     "STOP", "MISSING INPUT: predictions_subtype.parquet",
+     "Stage 3b with its resume store missing stops at the check"),
+    ("stage3b-subtype-harness", {"predictions_subtype.parquet": 16786},
+     "STOP", "MISSING INPUT: unified.parquet", "Stage 3b without Stage 1 stops at the check"),
 ]
 for nb, files, want, reason, label in CASES:
     with tempfile.TemporaryDirectory() as root:
@@ -179,7 +215,19 @@ for nb, files, want, reason, label in CASES:
     check(f"{label}  ({nb})", got == want and (reason in out if reason else True),
           f"got {got}; output tail: {out[-300:]!r}")
 
-for nb in ("stage2-finetuned-baselines", "stage3b-repair", "stage4-analysis", "stage5-cost"):
+# Two Stage 1 outputs attached at once: the old two-corpus one sorts first
+# here, and without the check Stage 3 would run on it and find no GitReq cell.
+for nb, store, n in (("stage3-llm-harnes", "predictions_llm.parquet", 35049),
+                     ("stage3b-subtype-harness", "predictions_subtype.parquet", 16786)):
+    with tempfile.TemporaryDirectory() as root:
+        attach(Path(root) / "a-data-pipeline", {"unified.parquet": 1412})
+        attach(Path(root) / "b-gitreq-data-pipeline", {"unified.parquet": 7712, store: n})
+        got, out = preflight(nb, root)
+    check(f"{nb}: two Stage 1 outputs attached stop the run as a duplicate",
+          got == "STOP" and "DUPLICATE: unified.parquet is attached 2 times" in out,
+          out[-300:])
+
+for nb in CHECKING:
     s = src_of(nb)
     want = "RESUMES_FINETUNED = True" if nb.startswith("stage2") else "RESUMES_FINETUNED = False"
     check(f"{nb}: declares {want}", want in s)
@@ -193,8 +241,38 @@ def input_loop(nb):
 ref = input_loop("stage5-cost")
 check("the rule stops on a missing CONSUMED file",
       'problems.append(f"MISSING INPUT: {fname}' in ref)
-for nb in ("stage2-finetuned-baselines", "stage3b-repair", "stage4-analysis"):
+for nb in CHECKING[:-1]:
     check(f"{nb}: input loop identical to stage5-cost's", input_loop(nb) == ref)
+
+
+def table(nb, name):
+    s = src_of(nb)
+    i = s.index(f"    {name} = {{")
+    return s[i:s.index("    }\n", i)]
+
+
+# One table of inputs and one of expected sizes: a stage that described a
+# file differently, or knew a size another did not, is a contradiction the
+# logs would show side by side.
+for name in ("WANTED", "EXPECTED"):
+    ref_t = table("stage5-cost", name)
+    for nb in CHECKING[:-1]:
+        check(f"{nb}: {name} identical to stage5-cost's", table(nb, name) == ref_t)
+for nb in CHECKING:
+    fn = [n for n in ast.parse(src_of(nb)).body
+          if isinstance(n, ast.FunctionDef) and n.name == "_check_kaggle_inputs"][0]
+    lits = {t.id: n.value for n in ast.walk(fn) if isinstance(n, ast.Assign)
+            for t in n.targets if isinstance(t, ast.Name) and t.id in ("WANTED", "CONSUMED")}
+    wanted, consumed = ast.literal_eval(lits["WANTED"]), ast.literal_eval(lits["CONSUMED"])
+    check(f"{nb}: every file it consumes is one the check looks for",
+          set(consumed) <= set(wanted), sorted(set(consumed) - set(wanted)))
+for nb, store in (("stage3-llm-harnes", "predictions_llm.parquet"),
+                  ("stage3b-subtype-harness", "predictions_subtype.parquet")):
+    s = src_of(nb)
+    check(f"{nb}: the check runs before anything else in the stage",
+          s.index("_check_kaggle_inputs()\n") < s.index("CONFIG = {"))
+    check(f"{nb}: consumes exactly the corpus and its own store",
+          f'CONSUMED = {{"unified.parquet", "{store}"}}' in s)
 
 # =============================================================================
 print("\n== 4. a missing or broken store never turns into a run from scratch ==")
@@ -277,7 +355,7 @@ def mount_block(nb):
     i = s.index("        if any(p.startswith(\"MISSING INPUT\") for p in problems):")
     return s[i:s.index("        raise SystemExit(\"Fix the problems above", i)]
 ref = mount_block("stage5-cost")
-for nb in ("stage2-finetuned-baselines", "stage3b-repair", "stage4-analysis"):
+for nb in CHECKING[:-1]:
     check(f"{nb}: mount listing identical to stage5-cost's", mount_block(nb) == ref)
 
 with tempfile.TemporaryDirectory() as root:                       # nothing attached
@@ -303,6 +381,111 @@ with tempfile.TemporaryDirectory() as root:                       # correct inpu
     got, out = preflight("stage2-finetuned-baselines", root)
 check("a correct run prints no mount listing at all",
       got == "RUN" and "WHAT IS ACTUALLY MOUNTED" not in out)
+
+# =============================================================================
+print("\n== 6. a resumed harness stops on a store that does not match its items ==")
+# The resume skips items by id. If the evaluation sets came out differently
+# (another corpus, a library that samples differently), the old answers stay
+# and the new items are queued beside them. check_resume_items stops that
+# before any model loads; plan_outstanding feeds the gate's last check.
+GUARD_FUNCS = {"check_resume_items", "plan_outstanding", "stratified", "done_keys",
+               "build_todo", "conditions_for", "pick_examples"}
+
+
+def guard_ns(nb, frames, core, config):
+    ns = lift(nb, GUARD_FUNCS, HARNESSES[nb] | {"PHASE_PRIMARY", "PHASE_EXTRA"})
+    ns.update(FRAMES=frames, CORE=core, POOL={k: [] for k in frames},
+              CONFIG=config, log=logging.getLogger("test"))
+    return ns
+
+
+def rows(ids, task="t", ds="d", pid="base", k=0, tag="m"):
+    return pd.DataFrame({"model_tag": tag, "prompt_id": pid, "shot_k": k,
+                         "task": task, "dataset": ds, "id": list(ids)})
+
+
+def guard_outcome(ns, store):
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            ns["check_resume_items"](store)
+        return "passed"
+    except RuntimeError:
+        return "stopped"
+
+
+for nb in HARNESSES:
+    fr = pd.DataFrame({"id": [f"x_{i:03d}" for i in range(60)], "text": "t",
+                       "y_true": ["A"] * 42 + ["B"] * 18})
+    ns = guard_ns(nb, {("t", "d"): fr}, {}, {"full_set_cap": 50})
+    core = ns["stratified"](fr, 20)
+    ns["CORE"] = {("t", "d"): core}
+    full = ns["stratified"](fr, 50)
+    outside = sorted(set(fr.id) - set(full.id) - set(core.id))
+    not_core = sorted(set(full.id) - set(core.id))
+    ok = pd.concat([rows(full.id), rows(core.id, k=2), rows(core.id[:5], pid="terse")])
+    check(f"{nb}: a store inside the plan passes", guard_outcome(ns, ok) == "passed")
+    check(f"{nb}: an empty store passes", guard_outcome(ns, ok.iloc[0:0]) == "passed")
+    check(f"{nb}: a few-shot answer for a non-core item stops the run",
+          guard_outcome(ns, pd.concat([ok, rows(not_core[:1], k=2)])) == "stopped")
+    check(f"{nb}: a prompt-variant answer for a non-core item stops the run",
+          guard_outcome(ns, pd.concat([ok, rows(not_core[:1], pid="terse")])) == "stopped")
+    check(f"{nb}: a zero-shot answer outside the capped full set stops the run",
+          bool(outside) and guard_outcome(ns, pd.concat([ok, rows(outside[:1])])) == "stopped")
+    check(f"{nb}: answers for a frame the corpus no longer has stop the run",
+          guard_outcome(ns, pd.concat([ok, rows(core.id[:3], ds="gone")])) == "stopped")
+
+    src = src_of(nb)
+    check(f"{nb}: the check runs on the seeded store before any model loads",
+          src.index("check_resume_items(_SEEDED)") > src.index("_SEEDED = load_store()")
+          and src.index("check_resume_items(_SEEDED)")
+          < src.index("CONFIG[\"open_models\"], DROPPED_MODELS = preflight_models(_needs)"))
+    check(f"{nb}: the gate counts what is owed on the WHOLE store, before quarantine",
+          "OUTSTANDING = plan_outstanding(store, _ALL_LOCAL)" in src
+          and "STAGE3_OK = verify_stage3(scored, summary, quarantined, OUTSTANDING)" in src
+          and '"predictions_still_owed": OUTSTANDING' in src)
+    check(f"{nb}: the gate fails while any local model still owes predictions",
+          'chk("every local model answered its whole plan (both phases)", not left,' in src)
+
+
+def func_src(nb, name):
+    return ast.unparse([n for n in ast.parse(src_of(nb)).body
+                        if isinstance(n, ast.FunctionDef) and n.name == name][0])
+for name in ("check_resume_items", "plan_outstanding"):
+    check(f"{name} is identical in both harnesses",
+          func_src("stage3-llm-harnes", name) == func_src("stage3b-subtype-harness", name))
+
+# Against the real committed stores and the real GitReq corpus: the guard
+# passes, exactly the GitReq cells are owed, and a different draw is caught.
+STORES = {"stage3-llm-harnes": (os.environ.get("STAGE3_STORE"), 25200),
+          "stage3b-subtype-harness": (os.environ.get("STAGE3B_STORE"), 11030)}
+for nb, (store_path, owed) in STORES.items():
+    if not (uni_path and Path(uni_path).exists() and store_path and Path(store_path).exists()):
+        skip(f"{nb}: the committed store against the GitReq corpus",
+             "set THREE_CORPUS_UNIFIED and STAGE3_STORE / STAGE3B_STORE")
+        continue
+    names = HARNESSES[nb] | {"PHASE_PRIMARY", "PHASE_EXTRA"}
+    real = pd.read_parquet(store_path)
+    for seed, want in ((None, "passed"), (43, "stopped")):
+        ns = lift(nb, GUARD_FUNCS | {"build_frames", "carve_pool"}, names)
+        if seed is not None:
+            ns["SEED"] = seed
+        cfg = ns["CONFIG"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            raw = {k: v for k, v in ns["build_frames"](uni).items() if len(v) > 0}
+        frames, pool = ns["carve_pool"](raw, cfg["fewshot_pool_per_class"])
+        ns.update(FRAMES=frames, POOL=pool, log=logging.getLogger("test"),
+                  CORE={k: ns["stratified"](v, cfg["core_eval_n"]) for k, v in frames.items()})
+        got = guard_outcome(ns, real)
+        if seed is None:
+            check(f"{nb}: the committed store ({len(real):,} rows) matches the GitReq "
+                  f"corpus's evaluation sets", got == want)
+            left = ns["plan_outstanding"](real, cfg["open_models"])
+            check(f"{nb}: the resume owes exactly the cells GitReq added ({owed:,} predictions)",
+                  sum(left.values()) == owed, left)
+        else:
+            check(f"{nb}: a different draw (seed {seed}) is caught before any model loads",
+                  got == want)
 
 print(f"\n{'=' * 60}\n  {PASS} passed, {FAIL} failed, {SKIP} skipped\n{'=' * 60}")
 sys.exit(1 if FAIL else 0)
