@@ -249,6 +249,12 @@ missing, the check now prints what Kaggle actually mounted under
 with no files (an attached notebook version with no output), or files under
 other names.
 
+**Re-importing clears the inputs too.** On 6 October a newer Stage 3 file was
+imported into the page that already had its two inputs, and the next version
+ran with nothing mounted - the check stopped it in 28 s. An import resets the
+page's inputs, so after **every** import: Add Input again, refresh, and check
+the panel lists every input with its files before Save Version.
+
 **Stages 3 and 3b must be run from the current files.** Each maps every
 evaluation cell to a fine-tuned comparator label (`COMPARABLE_FT_FOLD`), and
 the map named only the two original corpora: `fr_nfr/gitreq`, `security/gitreq`,
