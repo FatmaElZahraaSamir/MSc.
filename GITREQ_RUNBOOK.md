@@ -169,6 +169,20 @@ What the notebooks now do about it:
 * `price_override_for()` resolves an id written either way (`qwen/qwen3.8-27b`
   or `qwen3.8-27b`), and declines to guess if two providers share a short name
   at different rates.
+* **A busy server never changes the model.** On 6 October the probe met a 503
+  ("high demand") from `gemini-3.1-flash-lite`, the committed commercial model,
+  and moved on to `gemini-3.5-flash-lite` - which would have put a second
+  Gemini model on the GitReq cells only, confounding the corpus comparison. A
+  named candidate that is only busy (429, 5xx, timeout) is now retried after
+  15, 30 and 60 s; if it is still busy, its provider sits that session out
+  instead of switching models (`sits this session out` in the log,
+  `busy_this_session` in `commercial_availability.json`), and a later session
+  tops it up. The committed model now leads Gemini's named list, and
+  OpenRouter's names its committed route first and then
+  `nvidia/nemotron-3.5-lightning:free`, the route a live probe reached that
+  day, so both harnesses resolve to the same models by construction. A 503
+  during the run is retried like a rate limit instead of being booked as a
+  permanent failure.
 
 > **Attach the resume store, or lose the Llama rows.** Without
 > `predictions_llm.parquet` under `/kaggle/input`, Stage 3 starts from scratch
@@ -342,7 +356,7 @@ STAGE3_STORE=/path/to/predictions_llm.parquet \
 STAGE3B_STORE=/path/to/predictions_subtype.parquet python3 tests/test_run_guards.py
 ```
 
-325 checks in total (36 + 32 + 50 + 87 + 120). They import the notebooks
+369 checks in total (36 + 32 + 50 + 131 + 120). They import the notebooks
 themselves rather than a copy, so what is tested is what runs.
 
 Verified while writing this: Stage 1 reproduces the committed corpus exactly and

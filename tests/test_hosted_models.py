@@ -237,5 +237,147 @@ for nb in HARNESSES:
     check(f"{nb}: manifest still carries the estimated-price list",
           '"models_with_estimated_prices": sorted(ESTIMATED_PRICES),' in SRC[nb])
 
+# =============================================================================
+print("\n== 9. a busy server never decides which model a harness reports ==")
+# 6 October 2026: gemini-3.1-flash-lite - the committed commercial model -
+# answered the probe with a 503 ("high demand"), and the probe moved on to
+# gemini-3.5-flash-lite, which would have put a second Gemini model on the
+# GitReq cells only. These run the notebooks' own probe against a fake API.
+import contextlib, io, json, os, tempfile, time as _time
+
+GEMINI_503 = ("503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is "
+              "currently experiencing high demand. Spikes in demand are usually "
+              "temporary. Please try again later.', 'status': 'UNAVAILABLE'}}")
+CLASSES = {
+    GEMINI_503: "temporarily unavailable",
+    "Request timed out.": "temporarily unavailable",
+    "Connection error.": "temporarily unavailable",
+    "Error code: 502 - Bad Gateway": "temporarily unavailable",
+    "Error code: 429 - {'error': {'message': 'Rate limit exceeded'}}": "rate limited",
+    "Error code: 404 - {'error': {'message': 'No endpoints found for x:free.'}}":
+        "model not available",
+    "404 NOT_FOUND. models/gemini-2.5-flash-lite is unavailable": "model not available",
+    "Error code: 403 - Forbidden": "invalid or unauthorised key",
+    "429 RESOURCE_EXHAUSTED. limit: 0": "no free quota on this account",
+}
+PROBE_FUNCS = {"probe_hosted", "probe_candidate", "classify_hosted_error",
+               "price_override_for", "hosted_tag", "hosted_call"}
+PROBE_NAMES = {"CONFIG", "TRANSIENT_ERRORS", "PROBE_RETRY_WAITS"}
+
+
+def probe_ns(nb, behaviour, providers=("gemini",), discovered=()):
+    """The notebook's own probe; `behaviour` maps model id -> list of outcomes,
+    each an exception message or an answer. The last outcome repeats."""
+    ns = lift(nb, PROBE_FUNCS, PROBE_NAMES)
+    calls = []
+
+    def fake_call(provider, client, model_id, prompt):
+        calls.append(model_id)
+        seq = behaviour.get(model_id, ["Error code: 404 - not found"])
+        out = seq[min(sum(1 for c in calls if c == model_id) - 1, len(seq) - 1)]
+        if out.startswith(("503", "Error", "Request", "Connection", "429", "404")):
+            raise RuntimeError(out)
+        return out, 10, 1, 0.1
+
+    tmp = tempfile.mkdtemp()
+    ns.update(HOSTED={p: {"key": "k", **ns["CONFIG"]["hosted_providers"][p]}
+                      for p in providers},
+              PROBE_LOG=[], HOSTED_PRICES={}, ESTIMATED_PRICES=set(),
+              PROBE_RAN=False, OUT=tmp, json=json, os=os,
+              time=type("T", (), {"sleep": staticmethod(lambda s: None),
+                                  "strftime": staticmethod(_time.strftime)}),
+              make_client=lambda name, key: object(),
+              discover_models=lambda name, client, match: list(discovered),
+              hosted_call_once=fake_call,
+              log=type("L", (), {"warning": staticmethod(lambda *a, **k: None)}))
+    return ns, calls, tmp
+
+
+def run_probe(ns):
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        ns["probe_hosted"]()
+    return out.getvalue()
+
+
+for nb in HARNESSES:
+    ns = lift(nb, PROBE_FUNCS, PROBE_NAMES)
+    for msg, want in CLASSES.items():
+        check(f"{nb}: '{msg[:38]}...' is classed '{want}'",
+              ns["classify_hosted_error"](msg) == want,
+              ns["classify_hosted_error"](msg))
+    prov = ns["CONFIG"]["hosted_providers"]
+    check(f"{nb}: the committed Gemini model leads the named order",
+          prov["gemini"]["candidates"][0][0] == "gemini-3.1-flash-lite")
+    check(f"{nb}: OpenRouter: committed model first, then the pinned live one",
+          [m for m, _, _ in prov["openrouter"]["candidates"][:2]] ==
+          ["nvidia/nemotron-3-nano-30b-a3b:free", "nvidia/nemotron-3.5-lightning:free"])
+
+    # (a) busy twice, then answers: the committed model is kept.
+    ns, calls, tmp = probe_ns(nb, {"gemini-3.1-flash-lite": [GEMINI_503, GEMINI_503, "security"],
+                                   "gemini-3.5-flash-lite": ["security"]})
+    out = run_probe(ns)
+    check(f"{nb}: a 503 that clears keeps the committed Gemini model",
+          ns["HOSTED"].get("gemini", {}).get("model") == "gemini-3.1-flash-lite"
+          and "gemini-3.5-flash-lite" not in calls, out[-300:])
+
+    # (b) busy through every retry: Gemini sits out, it is NOT replaced.
+    ns, calls, tmp = probe_ns(nb, {"gemini-3.1-flash-lite": [GEMINI_503],
+                                   "gemini-3.5-flash-lite": ["security"]})
+    out = run_probe(ns)
+    avail = json.load(open(os.path.join(tmp, "commercial_availability.json")))
+    check(f"{nb}: a 503 that persists skips Gemini instead of switching models",
+          "gemini" not in ns["HOSTED"] and "gemini-3.5-flash-lite" not in calls
+          and calls.count("gemini-3.1-flash-lite") == 1 + len(ns["PROBE_RETRY_WAITS"]),
+          out[-400:])
+    check(f"{nb}: ...and says it is load, not an account limit",
+          "BUSY THROUGH EVERY RETRY" in out and "NO COMMERCIAL" not in out)
+    check(f"{nb}: ...and records it in commercial_availability.json",
+          avail.get("busy_this_session") == {"gemini": "gemini-3.1-flash-lite"})
+
+    # (c) gone for good (404): the next named model is still taken.
+    ns, calls, tmp = probe_ns(nb, {"gemini-3.1-flash-lite": ["Error code: 404 - not found"],
+                                   "gemini-2.5-flash-lite": ["Error code: 404 - not found"],
+                                   "gemini-3.5-flash-lite": ["security"]})
+    run_probe(ns)
+    check(f"{nb}: a retired model still falls through to the next name",
+          ns["HOSTED"].get("gemini", {}).get("model") == "gemini-3.5-flash-lite")
+
+    # (d) OpenRouter today: the committed route is gone, the pinned one answers.
+    ns, calls, tmp = probe_ns(nb, {"nvidia/nemotron-3.5-lightning:free": ["security"]},
+                              providers=("openrouter",))
+    run_probe(ns)
+    check(f"{nb}: OpenRouter resolves to the pinned model by name, not by discovery",
+          ns["HOSTED"].get("openrouter", {}).get("model") == "nvidia/nemotron-3.5-lightning:free")
+
+    # (e) discovered routes promise nothing, so a busy one still falls through.
+    ns, calls, tmp = probe_ns(nb, {"x/busy:free": ["Error code: 429 - rate limit"],
+                                   "x/ok:free": ["security"]},
+                              providers=("openrouter",), discovered=("x/busy:free", "x/ok:free"))
+    run_probe(ns)
+    check(f"{nb}: a busy DISCOVERED route falls through without retries",
+          ns["HOSTED"].get("openrouter", {}).get("model") == "x/ok:free"
+          and calls.count("x/busy:free") == 1)
+
+    # (f) during the run, a 503 is retried like a rate limit.
+    ns, calls, tmp = probe_ns(nb, {"m": [GEMINI_503, "NFR"]})
+    ns["HOSTED"] = {"gemini": {"client": None, "model": "m"}}
+    check(f"{nb}: a 503 during the run is retried, not booked as a failure",
+          ns["hosted_call"]("gemini", "p")[0] == "NFR" and calls == ["m", "m"])
+    ns, calls, tmp = probe_ns(nb, {"m": [GEMINI_503]})
+    ns["HOSTED"] = {"gemini": {"client": None, "model": "m"}}
+    try:
+        ns["hosted_call"]("gemini", "p"); raised = ""
+    except RuntimeError as e:
+        raised = str(e)
+    check(f"{nb}: a 503 that never clears fails as such, after the retries",
+          raised == "temporarily unavailable after retries" and len(calls) == 4, raised)
+
+for label, start, end in [
+        ("probe_candidate + probe", 'def probe_candidate(', 'def report_retired_api_models('),
+        ("error classes", 'def classify_hosted_error(', 'def discover_models(')]:
+    a, b = (block(SRC[nb], start, end) for nb in HARNESSES)
+    check(f"{label} is byte-identical in both harnesses", a == b)
+
 print(f"\n{'=' * 60}\n  {PASS} passed, {FAIL} failed\n{'=' * 60}")
 sys.exit(1 if FAIL else 0)
