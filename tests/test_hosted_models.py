@@ -379,5 +379,98 @@ for label, start, end in [
     a, b = (block(SRC[nb], start, end) for nb in HARNESSES)
     check(f"{label} is byte-identical in both harnesses", a == b)
 
+# =============================================================================
+print("\n== 10. a throttled provider cannot eat the session ==")
+# 6 October 2026: Groq answered every request only after two to four
+# rate-limit retries, ~46 s each against a 2.4 s plan. Retries succeed, so the
+# ten-failures stop never fired; 900 requests planned at 36 minutes ran for
+# 8.5 hours, until Kaggle's 12-hour limit killed the session before any local
+# model reached phase 2. These run the notebooks' own loop on a fake clock.
+
+
+def hosted_loop(nb, latency_s, queued=1500, out_of_time=None, **config):
+    ns = lift(nb, {"run_hosted_provider"}, {"CONFIG"})
+    ns["CONFIG"].update(config)
+    clock = {"t": 0.0}
+    warnings = []
+    item = lambda k: ({"shot_k": 0, "prompt_id": "base", "split": "zero_shot"},
+                      "fr_nfr", f"ds{k % 5}", [], type("R", (), {"id": k, "text": "t"}))
+
+    def fake_call(provider, prompt):
+        clock["t"] += latency_s
+        return "FR", 10, 1, latency_s
+
+    def save_store(rows, store):
+        store = store + len(rows); rows.clear()
+        return store
+
+    ns.update(HOSTED={"groq": {"model": "qwen/qwen3.8-27b", "kind": "open_hosted",
+                               "weights": "open", "rpm": 25, "daily_cap": 900,
+                               "price": (0.0, 0.0)}},
+              FAILURES=[], HOSTED_STOPS=[],
+              hosted_tag=lambda p, m: "groq-qwen3.8-27b",
+              build_todo=lambda tag, conds, done: [item(k) for k in range(queued)],
+              conditions_for=lambda m, is_hosted=False: [], done_keys=lambda s: set(),
+              build_prompt=lambda *a: "p", parse_label=lambda task, raw: (raw, True),
+              make_row=lambda *a, **k: list(a), hosted_call=fake_call,
+              save_store=save_store,
+              time=type("T", (), {"time": staticmethod(lambda: clock["t"]),
+                                  "sleep": staticmethod(lambda s: clock.__setitem__(
+                                      "t", clock["t"] + s))}),
+              log=type("L", (), {"info": staticmethod(lambda *a: None),
+                                 "warning": staticmethod(
+                                     lambda *a: warnings.append(a[0] % a[1:]))}))
+    n = ns["run_hosted_provider"]("groq", 0, [], out_of_time=out_of_time)
+    return n, ns["HOSTED_STOPS"], clock["t"] / 60, warnings
+
+
+for nb in HARNESSES:
+    cfg = NS[nb]["CONFIG"]
+    check(f"{nb}: the allowance is twice the plan plus 20 minutes",
+          cfg.get("hosted_time_factor") == 2.0 and cfg.get("hosted_time_margin_min") == 20)
+
+    # (a) the 6 October replay: ~46 s a request, 900 of 1,500 within the cap.
+    n, stops, minutes, warns = hosted_loop(nb, latency_s=46.0)
+    allowance = 2.0 * 900 * (60 / 25) / 60 + 20          # 92 min
+    check(f"{nb}: Groq at 46 s a request stops at its 92-min allowance, not at 8.5 h",
+          len(stops) == 1 and stops[0]["reason"] == "time allowance"
+          and stops[0]["allowance_min"] == allowance
+          and allowance < minutes <= allowance + 46 / 60, f"{stops} {minutes:.1f} min")
+    check(f"{nb}: ...every answer it gave is kept",
+          n == stops[0]["requests_sent"] == 121, f"n={n} {stops}")
+    check(f"{nb}: ...and the log says so, and that the next session tops it up",
+          any("allowance" in w and "next session tops it up" in w for w in warns), warns)
+
+    # (b) a provider at its planned pace is never cut short.
+    n, stops, minutes, warns = hosted_loop(nb, latency_s=1.0)
+    check(f"{nb}: a provider at its planned pace answers all 900 in ~36 min",
+          n == 900 and not stops and 35 < minutes < 37, f"n={n} {minutes:.1f} min {stops}")
+
+    # (c) the session budget is checked before every request.
+    seen = []
+    def budget(what, seen=seen):
+        seen.append(what); return len(seen) > 30
+    n, stops, minutes, warns = hosted_loop(nb, latency_s=1.0, out_of_time=budget)
+    check(f"{nb}: the session budget stops a provider between two requests",
+          n == 30 and stops == [{"model_tag": "groq-qwen3.8-27b", "reason": "session budget",
+                                 "requests_sent": 30, "queued": 900}]
+          and seen[-1] == "the rest of groq-qwen3.8-27b", f"n={n} {stops}")
+
+    # (d) the documented off switch really switches it off.
+    n, stops, minutes, warns = hosted_loop(nb, latency_s=46.0, queued=200,
+                                           hosted_time_factor=None)
+    check(f"{nb}: hosted_time_factor=None disables the allowance",
+          n == 200 and not stops, f"n={n} {stops}")
+
+    check(f"{nb}: full_run hands the session budget to the API loop",
+          "run_hosted_provider(provider, store, rows,\n"
+          "                                                out_of_time=over_budget)"
+          in SRC[nb])
+    check(f"{nb}: the manifest records every provider stopped early",
+          '"api_providers_stopped_early": HOSTED_STOPS,' in SRC[nb])
+
+a, b = (block(SRC[nb], "def run_hosted_provider(", "def bootstrap_ci(") for nb in HARNESSES)
+check("run_hosted_provider is byte-identical in both harnesses", a == b)
+
 print(f"\n{'=' * 60}\n  {PASS} passed, {FAIL} failed\n{'=' * 60}")
 sys.exit(1 if FAIL else 0)

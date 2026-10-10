@@ -192,8 +192,8 @@ What the notebooks now do about it:
 
 **No session is lost to Kaggle's 12-hour limit.** Stage 2 stops itself at
 10.5 h with the store flushed; Stages 3 and 3b check a 10 h budget before each
-model and each API provider, so phase 1 — the core comparison — completes for
-every model before phase 2 is cut. Attach a stopped session's output as the next
+model and before every API request, so phase 1 — the core comparison — completes
+for every model before phase 2 is cut. Attach a stopped session's output as the next
 session's input and it resumes. Stage 2's store is complete at exactly
 **208,336 rows**; the new runs take about 14 GPU-hours, so it needs two sessions.
 
@@ -254,6 +254,35 @@ imported into the page that already had its two inputs, and the next version
 ran with nothing mounted - the check stopped it in 28 s. An import resets the
 page's inputs, so after **every** import: Add Input again, refresh, and check
 the panel lists every input with its files before Save Version.
+
+**Stage 3 session 1 ran out of time, and an API provider no longer can make it
+do so.** The 6 October Stage 3 run finished phase 1 for all six local models
+(14,400 predictions, saved), then reached the API tier. Groq began answering
+each request only after two to four rate-limit retries - about 46 s a request
+against the 2.4 s its 25 RPM plan assumes. Every request did succeed in the
+end, so the ten-consecutive-failures stop never fired, and the session budget
+was checked only between providers: 900 requests planned at 36 minutes ran for
+8.5 hours, until Kaggle's 12-hour limit cancelled the version (exit 137) before
+phase 2 began. Nothing was lost - the store is flushed every 50 rows and the
+cancelled version's output was saved - but the 10,800 phase-2 predictions are
+still owed. Both harnesses now give each API provider an allowance of twice its
+planned time plus 20 minutes (`hosted_time_factor`, `hosted_time_margin_min`);
+past it the provider stops, keeps its answers, and the next session tops it up.
+The session budget is checked before every API request too, and each provider
+stopped early is recorded in the manifest (`api_providers_stopped_early`).
+Replayed at 46 s a request, Groq now stops after 121 requests at its 92-minute
+allowance instead of running on for 8.5 hours.
+
+**Stage 3 session 2.** As for Stage 2: a new notebook from the current
+`stage3-llm-harnes.ipynb`, with exactly two inputs - Stage 1's output and
+**session 1's output** - and not the 35,049-row store attached to session 1
+(two `predictions_llm.parquet` trip the `DUPLICATE` guard). The preflight reads
+about 50,300 rows, "larger than the two-corpus reference", which is a note, not
+a stop. Rebuilt from the committed store and the session-1 log, that store
+passes the resume check and owes exactly **10,800** local predictions, all in
+phase 2 (1,400 per model, 2,600 for the two prompt sub-study models); phase 1
+owes none. Done when the gate prints `PASS  every local model answered its
+whole plan (both phases)` and `RESULT: ALL CHECKS PASSED`.
 
 **Stages 3 and 3b must be run from the current files.** Each maps every
 evaluation cell to a fine-tuned comparator label (`COMPARABLE_FT_FOLD`), and
@@ -336,6 +365,7 @@ give. And its FR/NFR arm is partly a surface-form probe (`gitreq_marker_flags.cs
    it to one — a latent IndexError in the original code, which the two-corpus
    rows happened to avoid.
 10. The long stages had no session budget (above).
+11. A throttled API provider could run until Kaggle's 12-hour limit (above).
 
 After all of it, the committed two-corpus run still reproduces exactly: all 17
 Stage 4 tables (four gain one identifying column: `transfer_source`,
